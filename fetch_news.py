@@ -41,7 +41,7 @@ FEEDS = [
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
-PER_FEED = 60                   # ile najnowszych z jednego zrodla pobieramy do obrobki
+PER_FEED = 20                   # ile najnowszych z jednego zrodla pobieramy do obrobki
 UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
 
 # ------------------------------------------------------------------ #
@@ -73,7 +73,10 @@ BLOCK = [
 #    zawierajace ktorys z tych rdzeni. To najostrzejszy filtr — wlacz,
 #    gdy chcesz wylacznie tematy podatkowo-prawne. Moze uciac trafne
 #    wpisy bez tych slow. Domyslnie pusta (= bialej listy nie ma).
-FOCUS = []
+FOCUS = ["vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg","ordynacj", "ustaw", 
+         "nowelizacj", "interpretacj", "orzeczeni","wyrok", "nsa", "tsue", "fiskus", "skarbow", 
+         "akcyz", "ryczałt", "faktur", "jpk", "doręczeni", "deklaracj", "rozliczeni", "danin","opłat", 
+         "ministerstwo finansów", "estoński", "dziennik ustaw"]
 # Gotowa biala lista — skopiuj do FOCUS = [...], jesli chcesz ja wlaczyc:
 # FOCUS = ["vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg",
 #          "ordynacj", "ustaw", "nowelizacj", "interpretacj", "orzeczeni",
