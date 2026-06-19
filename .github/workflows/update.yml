@@ -1,6 +1,8 @@
 name: Aktualizacja Paragraf
 
 on:
+  push:
+    branches: [main]            # każda zmiana w repo => automatyczna przebudowa
   schedule:
     # Godziny w UTC. Latem (UTC+2) to ok. 07:00, 12:00, 18:00 czasu polskiego.
     - cron: "0 5,10,16 * * *"
