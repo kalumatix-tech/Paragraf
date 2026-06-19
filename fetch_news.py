@@ -1,0 +1,403 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Paragraf — generator kokpitu podatkowo-prawnego.
+Pobiera kanaly RSS i sklada statyczna strone public/index.html.
+Uruchamiany automatycznie przez GitHub Actions (patrz .github/workflows/update.yml).
+
+Aby DODAC lub USUNAC zrodlo: edytuj liste FEEDS ponizej.
+Aby wlaczyc podsumowanie AI: dodaj sekret ANTHROPIC_API_KEY w ustawieniach repo.
+"""
+
+import os
+import re
+import html
+import json
+import datetime
+import pathlib
+
+import feedparser
+import requests
+
+# ------------------------------------------------------------------ #
+#  ZRODLA  —  dodawaj / usuwaj tutaj                                  #
+# ------------------------------------------------------------------ #
+FEEDS = [
+    {"id": "infor-ks", "name": "INFOR Księgowość",      "cat": "Podatki", "color": "#8a2e2a",
+     "url": "https://rss.infor.pl/rss/ksiegowosc_artykuly.xml"},
+    {"id": "gp-fin",   "name": "Gazeta Prawna · Podatki", "cat": "Podatki", "color": "#9a6b2e",
+     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Finanse"},
+    {"id": "infor-pr", "name": "INFOR Prawo",            "cat": "Prawo",   "color": "#1b5e57",
+     "url": "https://rss.infor.pl/rss/prawo_artykuly.xml"},
+    {"id": "gp-pr",    "name": "Gazeta Prawna · Prawo",   "cat": "Prawo",   "color": "#5b4b8a",
+     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Prawo"},
+    {"id": "infor-ka", "name": "INFOR Kadry / ZUS",      "cat": "Kadry",   "color": "#3b5c8a",
+     "url": "https://rss.infor.pl/rss/kadry_artykuly.xml"},
+    {"id": "gp-biz",   "name": "Gazeta Prawna · Biznes",  "cat": "Biznes",  "color": "#2e6e8c",
+     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Biznes"},
+]
+
+MAX_ITEMS = 140                 # ile pozycji trzymamy na stronie
+PER_FEED = 40                   # ile najnowszych z jednego zrodla
+UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
+
+
+# ------------------------------------------------------------------ #
+#  POBIERANIE I PARSOWANIE                                            #
+# ------------------------------------------------------------------ #
+def strip_html(s: str) -> str:
+    s = re.sub(r"<[^>]+>", " ", s or "")
+    s = html.unescape(s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def to_iso(entry) -> str | None:
+    for key in ("published_parsed", "updated_parsed"):
+        t = entry.get(key)
+        if t:
+            try:
+                return datetime.datetime(*t[:6], tzinfo=datetime.timezone.utc).isoformat()
+            except Exception:
+                pass
+    return None
+
+
+def fetch_all():
+    items, live = [], 0
+    for f in FEEDS:
+        try:
+            parsed = feedparser.parse(f["url"], agent=UA)
+            entries = parsed.entries or []
+            if not entries:
+                print(f"  [pusto] {f['name']}")
+                continue
+            live += 1
+            for e in entries[:PER_FEED]:
+                title = strip_html(e.get("title", ""))
+                link = e.get("link", "") or ""
+                if not title or not link:
+                    continue
+                desc = strip_html(e.get("summary", "") or e.get("description", ""))
+                items.append({
+                    "title": title,
+                    "link": link,
+                    "desc": desc[:300],
+                    "date": to_iso(e),
+                    "src": f["name"],
+                    "cat": f["cat"],
+                    "color": f["color"],
+                    "fid": f["id"],
+                })
+            print(f"  [ok]    {f['name']}: {len(entries)} wpisów")
+        except Exception as ex:
+            print(f"  [błąd]  {f['name']}: {ex}")
+
+    items.sort(key=lambda it: it["date"] or "", reverse=True)
+    return items[:MAX_ITEMS], live
+
+
+# ------------------------------------------------------------------ #
+#  OPCJONALNE PODSUMOWANIE AI (jesli ustawiony ANTHROPIC_API_KEY)     #
+# ------------------------------------------------------------------ #
+def ai_summary(items):
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        print("  (bez AI — brak sekretu ANTHROPIC_API_KEY)")
+        return None
+    top = items[:25]
+    lst = "\n".join(
+        f"{i+1}. [{it['cat']}] {it['title']}" + (f" — {it['desc'][:150]}" if it["desc"] else "")
+        for i, it in enumerate(top)
+    )
+    prompt = (
+        "Jesteś asystentem podatkowo-prawnym dla profesjonalisty w Polsce. Poniżej najnowsze "
+        "nagłówki ze źródeł podatkowych i prawnych. Wybierz 5-7 NAJWAŻNIEJSZYCH rzeczy, które warto "
+        "dziś znać (zmiany przepisów, terminy, istotne interpretacje lub orzeczenia, KSeF, VAT, CIT, "
+        "PIT, ZUS). Każdą zapisz jako jedno krótkie, konkretne zdanie po polsku, zaczynając wiersz od "
+        "myślnika. Pomiń clickbait i powtórzenia. Bez wstępu i zakończenia.\n\nNagłówki:\n" + lst
+    )
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 700,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=45,
+        )
+        data = r.json()
+        parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
+        out = "\n".join(parts).strip()
+        print("  [AI] podsumowanie wygenerowane" if out else "  [AI] pusta odpowiedź")
+        return out or None
+    except Exception as ex:
+        print(f"  [AI błąd] {ex}")
+        return None
+
+
+# ------------------------------------------------------------------ #
+#  SZABLON STRONY                                                     #
+# ------------------------------------------------------------------ #
+TEMPLATE = r'''<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paragraf — kokpit podatkowo-prawny</title>
+<style>
+  :root{
+    --paper:#e9edf2;--surface:#fcfcfa;--ink:#16233b;--ink-soft:#586176;--ink-faint:#8a93a4;
+    --line:#d7dde5;--accent:#8a2e2a;--radius:14px;
+    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua","Hoefler Text",Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{max-width:768px;margin:0 auto;padding:0 20px 96px}
+
+  .masthead{position:sticky;top:0;z-index:20;background:rgba(233,237,242,.86);
+    backdrop-filter:saturate(160%) blur(10px);-webkit-backdrop-filter:saturate(160%) blur(10px);
+    border-bottom:1px solid var(--line)}
+  .masthead-in{max-width:768px;margin:0 auto;padding:16px 20px 12px}
+  .brandrow{display:flex;align-items:center;gap:14px}
+  .seal{flex:none;width:46px;height:46px;border-radius:11px;background:var(--accent);color:#f3e9df;
+    display:grid;place-items:center;font-family:var(--serif);font-size:28px;font-weight:600;line-height:1;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 6px rgba(138,46,42,.28);user-select:none}
+  .brandtext{flex:1;min-width:0}
+  .wordmark{font-family:var(--serif);font-weight:600;font-size:27px;letter-spacing:-.01em;line-height:1;margin:0}
+  .subtitle{margin-top:4px;font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .actions{margin-left:auto}
+  .iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);
+    font-size:13px;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .iconbtn:hover{border-color:var(--ink-faint)}
+  .iconbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .stats{display:flex;gap:22px;margin-top:13px;padding-top:11px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;gap:1px}
+  .stat .num{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1}
+  .stat .lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  .livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:5px;
+    vertical-align:middle;animation:pulse 2.2s ease-in-out infinite}
+
+  .controls{padding:18px 0 6px}
+  .search{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:11px;
+    padding:12px 14px;font-family:var(--sans);font-size:15px;color:var(--ink)}
+  .search::placeholder{color:var(--ink-faint)}
+  .search:focus{outline:none;border-color:var(--accent)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .chip{border:1px solid var(--line);background:var(--surface);padding:6px 11px 6px 9px;border-radius:999px;
+    cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-soft);display:inline-flex;align-items:center;gap:7px;transition:.15s;user-select:none}
+  .chip:hover{border-color:var(--ink-faint)}
+  .chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .chip[data-on="0"]{opacity:.4}
+  .chip[data-on="0"] .dot{filter:grayscale(1)}
+  .chip[data-empty="1"]{border-style:dashed}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .summary-panel{margin-top:16px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);
+    padding:18px 20px;box-shadow:0 1px 2px rgba(22,35,59,.04)}
+  .summary-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .summary-head .t{font-family:var(--serif);font-size:17px;font-weight:600}
+  .summary-body{font-size:14.5px;color:var(--ink)}
+  .summary-body ul{margin:0;padding:0;list-style:none}
+  .summary-body li{position:relative;padding:7px 0 7px 22px;border-bottom:1px solid var(--line)}
+  .summary-body li:last-child{border-bottom:none}
+  .summary-body li:before{content:"§";position:absolute;left:0;top:7px;font-family:var(--serif);color:var(--accent);font-weight:600}
+  .summary-note{margin-top:10px;font-size:12px;color:var(--ink-faint)}
+
+  .daysep{display:flex;align-items:center;gap:12px;margin:30px 0 14px}
+  .daysep .lab{font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink-soft);text-transform:capitalize;white-space:nowrap}
+  .daysep .rule{flex:1;height:1px;background:var(--line)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;
+    margin-bottom:11px;transition:.16s;position:relative;overflow:hidden}
+  .card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ccol,var(--line))}
+  .card:hover{border-color:var(--ink-faint);transform:translateY(-1px);box-shadow:0 4px 14px rgba(22,35,59,.07)}
+  .card .src{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--ccol,var(--ink-soft));margin-bottom:7px}
+  .card .src .dot{width:7px;height:7px;border-radius:50%;background:var(--ccol)}
+  .card .src .cat{color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:10px}
+  .card .title{font-family:var(--serif);font-size:18.5px;font-weight:600;line-height:1.32;letter-spacing:-.005em;text-decoration:none;display:block}
+  .card a.title:hover{text-decoration:underline;text-decoration-color:var(--ccol);text-underline-offset:3px}
+  .card .desc{margin-top:6px;color:var(--ink-soft);font-size:14px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .meta{margin-top:10px;font-size:12px;color:var(--ink-faint);font-weight:500}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--ink-soft)}
+  .empty .ic{font-family:var(--serif);font-size:44px;color:var(--line);margin-bottom:8px}
+  .empty h3{font-family:var(--serif);font-weight:600;font-size:19px;margin:0 0 6px;color:var(--ink)}
+
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint);line-height:1.6}
+  footer b{color:var(--ink-soft)}
+
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:560px){.wordmark{font-size:23px}.seal{width:42px;height:42px;font-size:25px}.stats{gap:16px}.card .title{font-size:17px}}
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-in">
+      <div class="brandrow">
+        <div class="seal">§</div>
+        <div class="brandtext">
+          <h1 class="wordmark">Paragraf</h1>
+          <div class="subtitle">kokpit podatkowo-prawny</div>
+        </div>
+        <div class="actions">
+          <button class="iconbtn" onclick="location.reload()" title="Wczytaj najnowszą wersję">Odśwież</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="num" id="stCount">{TOTAL_ITEMS}</span><span class="lab">Pozycje</span></div>
+        <div class="stat"><span class="num">{LIVE}/{TOTAL}</span><span class="lab">Źródła na żywo</span></div>
+        <div class="stat"><span class="num"><span class="livedot"></span><span id="stTime">—</span></span><span class="lab" id="stDate">aktualizacja</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="controls">
+      <input class="search" id="search" type="text" placeholder="Szukaj: VAT, KSeF, estoński CIT, ZUS, orzeczenie…" autocomplete="off">
+      <div class="chips" id="chips"></div>
+    </div>
+
+    {SUMMARY}
+
+    <main id="feed"></main>
+
+    <footer>
+      <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — wiadomości z portali podatkowo-prawnych w jednym miejscu, bez objeżdżania 20 stron.<br>
+      Źródła: INFOR (Księgowość, Prawo, Kadry) i Gazeta Prawna (Podatki, Prawo, Biznes). Chipem włączasz/wyłączasz źródło — wybór zapamiętuje się w przeglądarce.
+    </footer>
+  </div>
+
+<script>
+const DATA = {DATA};
+const BUILT = "{BUILT}";
+const FEEDS = {FEEDS};
+const state = { off:new Set(), q:"" };
+const $ = s => document.querySelector(s);
+try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
+const presentIds = new Set(DATA.map(d=>d.fid));
+
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+const PL = new Intl.DateTimeFormat("pl-PL",{day:"numeric",month:"long",year:"numeric"});
+function dayKey(d){return d?d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate():"x"}
+function dayLabel(d){
+  if(!d) return "Bez daty";
+  const t=new Date();t.setHours(0,0,0,0);const x=new Date(d);x.setHours(0,0,0,0);
+  const diff=Math.round((t-x)/86400000);
+  if(diff===0)return "Dziś";if(diff===1)return "Wczoraj";return PL.format(d);
+}
+function ago(d){
+  if(!d)return "";const s=(Date.now()-d.getTime())/1000;
+  if(s<60)return "przed chwilą";if(s<3600)return Math.floor(s/60)+" min temu";
+  if(s<86400)return Math.floor(s/3600)+" godz. temu";const k=Math.floor(s/86400);
+  if(k===1)return "wczoraj";if(k<8)return k+" dni temu";return PL.format(d);
+}
+
+function visible(){
+  const q=state.q.trim().toLowerCase();
+  return DATA
+    .filter(it=>!state.off.has(it.fid))
+    .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat).toLowerCase().includes(q))
+    .map(it=>({...it,_d:it.date?new Date(it.date):null}));
+}
+
+function renderChips(){
+  $("#chips").innerHTML = FEEDS.map(f=>{
+    const on=state.off.has(f.id)?"0":"1";
+    const empty=presentIds.has(f.id)?"0":"1";
+    return `<button class="chip" data-id="${f.id}" data-on="${on}" data-empty="${empty}" title="${empty==="1"?"Brak świeżych wpisów z tego źródła":"Włącz / wyłącz"}"><span class="dot" style="background:${f.color}"></span>${esc(f.name)}</button>`;
+  }).join("");
+  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+    const id=c.dataset.id; state.off.has(id)?state.off.delete(id):state.off.add(id);
+    try{localStorage.setItem("paragraf-off",JSON.stringify([...state.off]))}catch(e){}
+    renderChips(); render();
+  });
+}
+
+function render(){
+  const vis=visible();
+  $("#stCount").textContent=vis.length;
+  const feed=$("#feed");
+  if(!vis.length){
+    feed.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak wyników</h3><p>Zmień frazę albo włącz więcej źródeł powyżej.</p></div>`;
+    return;
+  }
+  let h="",last=null;
+  for(const it of vis){
+    const k=dayKey(it._d);
+    if(k!==last){h+=`<div class="daysep"><span class="lab">${esc(dayLabel(it._d))}</span><span class="rule"></span></div>`;last=k;}
+    h+=`<article class="card" style="--ccol:${it.color}">
+      <span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span></span>
+      <a class="title" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+      ${it.desc?`<p class="desc">${esc(it.desc)}</p>`:""}
+      <div class="meta">${esc(ago(it._d))||"—"}</div>
+    </article>`;
+  }
+  feed.innerHTML=h;
+}
+
+(function init(){
+  const b=BUILT?new Date(BUILT):null;
+  if(b){ $("#stTime").textContent=b.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"}); $("#stDate").textContent=PL.format(b); }
+  let t;$("#search").oninput=e=>{state.q=e.target.value;clearTimeout(t);t=setTimeout(render,160)};
+  renderChips(); render();
+})();
+</script>
+</body>
+</html>
+'''
+
+
+# ------------------------------------------------------------------ #
+#  RENDEROWANIE                                                       #
+# ------------------------------------------------------------------ #
+def render(items, feeds, summary, live):
+    built = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    summary_html = ""
+    if summary:
+        lines = [ln.strip().lstrip("-•*").strip() for ln in summary.splitlines() if ln.strip()]
+        lis = "".join(f"<li>{html.escape(ln)}</li>" for ln in lines)
+        summary_html = (
+            '<div class="summary-panel"><div class="summary-head">'
+            '<span class="t">Najważniejsze dziś · AI</span></div>'
+            f'<div class="summary-body"><ul>{lis}</ul>'
+            '<p class="summary-note">Wygenerowane automatycznie przy ostatniej aktualizacji. '
+            'Zawsze sprawdź źródło przed decyzją.</p></div></div>'
+        )
+
+    def safe(obj):
+        return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
+
+    return (TEMPLATE
+            .replace("{DATA}", safe(items))
+            .replace("{FEEDS}", safe(feeds))
+            .replace("{BUILT}", built)
+            .replace("{LIVE}", str(live))
+            .replace("{TOTAL}", str(len(feeds)))
+            .replace("{TOTAL_ITEMS}", str(len(items)))
+            .replace("{SUMMARY}", summary_html))
+
+
+def main():
+    print("Pobieram kanały RSS…")
+    items, live = fetch_all()
+    print(f"Łącznie {len(items)} pozycji z {live}/{len(FEEDS)} źródeł.")
+    summary = ai_summary(items)
+    out = pathlib.Path("public")
+    out.mkdir(exist_ok=True)
+    (out / "index.html").write_text(render(items, FEEDS, summary, live), encoding="utf-8")
+    print("Zapisano public/index.html — gotowe.")
+
+
+if __name__ == "__main__":
+    main()
