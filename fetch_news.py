@@ -15,31 +15,71 @@ import html
 import json
 import datetime
 import pathlib
+import unicodedata
 
 import feedparser
 import requests
 
 # ------------------------------------------------------------------ #
 #  ZRODLA  —  dodawaj / usuwaj tutaj                                  #
+#  (uzywamy AKTYWNEGO wzoru ".feed" — stare adresy rss.* byly martwe) #
 # ------------------------------------------------------------------ #
 FEEDS = [
-    {"id": "infor-ks", "name": "INFOR Księgowość",      "cat": "Podatki", "color": "#8a2e2a",
-     "url": "https://rss.infor.pl/rss/ksiegowosc_artykuly.xml"},
-    {"id": "gp-fin",   "name": "Gazeta Prawna · Podatki", "cat": "Podatki", "color": "#9a6b2e",
-     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Finanse"},
-    {"id": "infor-pr", "name": "INFOR Prawo",            "cat": "Prawo",   "color": "#1b5e57",
-     "url": "https://rss.infor.pl/rss/prawo_artykuly.xml"},
-    {"id": "gp-pr",    "name": "Gazeta Prawna · Prawo",   "cat": "Prawo",   "color": "#5b4b8a",
-     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Prawo"},
-    {"id": "infor-ka", "name": "INFOR Kadry / ZUS",      "cat": "Kadry",   "color": "#3b5c8a",
-     "url": "https://rss.infor.pl/rss/kadry_artykuly.xml"},
-    {"id": "gp-biz",   "name": "Gazeta Prawna · Biznes",  "cat": "Biznes",  "color": "#2e6e8c",
-     "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Biznes"},
+    {"id": "infor-ks", "name": "INFOR Księgowość",    "cat": "Podatki", "color": "#8a2e2a",
+     "url": "https://ksiegowosc.infor.pl/.feed"},
+    {"id": "infor-pr", "name": "INFOR Prawo",          "cat": "Prawo",   "color": "#1b5e57",
+     "url": "https://www.infor.pl/prawo/.feed"},
+    {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
+     "url": "https://kadry.infor.pl/.feed"},
+    {"id": "infor-mf", "name": "INFOR Moja firma",     "cat": "Biznes",  "color": "#2e6e8c",
+     "url": "https://mojafirma.infor.pl/.feed"},
+    # Dodatkowe gotowe kanaly Infor — odkomentuj, jesli chcesz wiecej:
+    # {"id": "infor-bud", "name": "INFOR Księgowość budżetowa", "cat": "Budżet", "color": "#9a6b2e",
+    #  "url": "https://ksiegowosc-budzetowa.infor.pl/.feed"},
+    # {"id": "infor-sam", "name": "INFOR Samorząd",     "cat": "Samorząd", "color": "#5b4b8a",
+    #  "url": "https://samorzad.infor.pl/.feed"},
 ]
 
-MAX_ITEMS = 140                 # ile pozycji trzymamy na stronie
-PER_FEED = 40                   # ile najnowszych z jednego zrodla
+MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
+PER_FEED = 60                   # ile najnowszych z jednego zrodla pobieramy do obrobki
 UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
+
+# ------------------------------------------------------------------ #
+#  ODSIEW  —  to tutaj decydujesz, co odpada                          #
+# ------------------------------------------------------------------ #
+#
+#  JAK DZIALA DOPASOWANIE SLOW (wazne dla polskiego!):
+#   - slowo 4+ liter dziala jak RDZEN i lapie odmiany:
+#         "loter"  zlapie loteria, loterii, loterię
+#         "mecz"   zlapie mecz, meczu, mecze
+#         "podatk" zlapie podatek, podatki, podatkowy
+#   - skrot 1-3 litery dziala jak CALE SLOWO (zeby nie psuc innych):
+#         "vat" zlapie VAT, VAT-u, ale NIE "prywatny"
+#         "pit" zlapie PIT, ale NIE "kapitał"
+#  Wniosek: do list wpisuj raczej RDZENIE slow, nie pelne formy.
+
+# 1) SWIEZOSC: pomijamy wpisy starsze niz tyle dni (0 = bez limitu).
+#    Dzieki temu martwe/zamrozone zrodlo nie wstrzyknie starych newsow.
+MAX_AGE_DAYS = 14
+
+# 2) CZARNA LISTA: wpis wypada, jesli zawiera KTORYS z tych rdzeni.
+BLOCK = [
+    "horoskop", "loter", "lotto", "konkurs", "webinar", "szkoleni",
+    "ranking", "notowani", "giełd", "odchudz", "celebryt", "plotk",
+    "mecz", "piłk", "rozrywk", "quiz", "kupon", "promo", "black friday",
+]
+
+# 3) BIALA LISTA (opcjonalna): jesli NIEPUSTA, zostaja TYLKO wpisy
+#    zawierajace ktorys z tych rdzeni. To najostrzejszy filtr — wlacz,
+#    gdy chcesz wylacznie tematy podatkowo-prawne. Moze uciac trafne
+#    wpisy bez tych slow. Domyslnie pusta (= bialej listy nie ma).
+FOCUS = []
+# Gotowa biala lista — skopiuj do FOCUS = [...], jesli chcesz ja wlaczyc:
+# FOCUS = ["vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg",
+#          "ordynacj", "ustaw", "nowelizacj", "interpretacj", "orzeczeni",
+#          "wyrok", "nsa", "tsue", "fiskus", "skarbow", "akcyz", "ryczałt",
+#          "faktur", "jpk", "doręczeni", "deklaracj", "rozliczeni", "danin",
+#          "opłat", "ministerstwo finansów", "estoński", "dziennik ustaw"]
 
 
 # ------------------------------------------------------------------ #
@@ -60,6 +100,26 @@ def to_iso(entry) -> str | None:
             except Exception:
                 pass
     return None
+
+
+def _norm(text: str) -> str:
+    """Małe litery, bez polskich ogonków, bez interpunkcji — do porównań."""
+    text = (text or "").lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9 ]+", " ", text)
+
+
+def _hit(haystack_padded: str, term: str) -> bool:
+    """4+ liter = rdzeń (łapie odmiany); 1-3 litery = całe słowo; spacja = fraza."""
+    term = _norm(term).strip()
+    if not term:
+        return False
+    if " " in term:
+        return term in haystack_padded
+    if len(term) <= 3:
+        return f" {term} " in haystack_padded
+    return term in haystack_padded
 
 
 def fetch_all():
@@ -93,7 +153,50 @@ def fetch_all():
             print(f"  [błąd]  {f['name']}: {ex}")
 
     items.sort(key=lambda it: it["date"] or "", reverse=True)
-    return items[:MAX_ITEMS], live
+    return items, live
+
+
+def apply_filters(items):
+    """Świeżość + czarna lista + opcjonalna biała lista + odsiew duplikatów."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    seen = set()
+    out = []
+    dropped_age = dropped_block = dropped_focus = dropped_dup = 0
+
+    for it in items:
+        # --- świeżość ---
+        if MAX_AGE_DAYS and it["date"]:
+            try:
+                d = datetime.datetime.fromisoformat(it["date"])
+                if (now - d).days > MAX_AGE_DAYS:
+                    dropped_age += 1
+                    continue
+            except Exception:
+                pass
+
+        hay = " " + _norm(it["title"] + " " + it["desc"]) + " "
+
+        # --- czarna lista ---
+        if any(_hit(hay, w) for w in BLOCK):
+            dropped_block += 1
+            continue
+
+        # --- biała lista (tylko jeśli niepusta) ---
+        if FOCUS and not any(_hit(hay, w) for w in FOCUS):
+            dropped_focus += 1
+            continue
+
+        # --- duplikaty (po znormalizowanym tytule) ---
+        key = _norm(it["title"])[:80]
+        if key in seen:
+            dropped_dup += 1
+            continue
+        seen.add(key)
+        out.append(it)
+
+    print(f"  Odsiano: {dropped_age} starych, {dropped_block} z czarnej listy, "
+          f"{dropped_focus} poza tematem, {dropped_dup} duplikatów.")
+    return out
 
 
 # ------------------------------------------------------------------ #
@@ -391,7 +494,9 @@ def render(items, feeds, summary, live):
 def main():
     print("Pobieram kanały RSS…")
     items, live = fetch_all()
-    print(f"Łącznie {len(items)} pozycji z {live}/{len(FEEDS)} źródeł.")
+    print(f"Pobrano {len(items)} pozycji z {live}/{len(FEEDS)} źródeł. Odsiewam…")
+    items = apply_filters(items)[:MAX_ITEMS]
+    print(f"Po odsiewie zostaje {len(items)} pozycji.")
     summary = ai_summary(items)
     out = pathlib.Path("public")
     out.mkdir(exist_ok=True)
