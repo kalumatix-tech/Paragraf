@@ -1,0 +1,52 @@
+name: Aktualizacja Paragraf
+
+on:
+  schedule:
+    # Godziny w UTC. Latem (UTC+2) to ok. 07:00, 12:00, 18:00 czasu polskiego.
+    - cron: "0 5,10,16 * * *"
+  workflow_dispatch: {}        # pozwala uruchomić ręcznie z zakładki Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Ustaw Pythona
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Zainstaluj zależności
+        run: pip install -r requirements.txt
+
+      - name: Zbuduj stronę
+        env:
+          # Opcjonalne podsumowanie AI — działa tylko, jeśli dodasz ten sekret w repo.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python fetch_news.py
+
+      - name: Przygotuj Pages
+        uses: actions/configure-pages@v5
+
+      - name: Wyślij pliki
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Opublikuj
+        id: deploy
+        uses: actions/deploy-pages@v4
