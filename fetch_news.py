@@ -46,12 +46,21 @@ FEEDS = [
     # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
-    {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+
+    # ============================================================== #
+    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -75,6 +84,8 @@ OFFICIAL_ENABLED = True
 SEJM_TERM = 10                 # kadencja Sejmu (zmien po nowych wyborach)
 OFFICIAL_MAX = 12             # ile PROJEKTOW (druki, z etapem) bierzemy z Sejmu
 ELI_MAX = 40                  # ile OPUBLIKOWANYCH aktow (Dz.U./MP) do wyszukiwarki ustaw
+RCL_MAX = 15                  # ile PROJEKTOW RZADOWYCH (RCL, przed Sejmem)
+RCL_PAGES = 4                 # ile stron listy RCL przejrzec (kazda ~10 pozycji)
 OFFICIAL_MAX_AGE_DAYS = 60    # okno swiezosci dla projektow (aktywne w procesie)
 
 OFFICIAL_SRC = {
@@ -378,6 +389,66 @@ def _api_get(url: str, timeout: int = 25):
         return None
 
 
+def _http_get_text(url: str, timeout: int = 25):
+    """Pobiera surowy HTML (RCL nie ma API — parsujemy stronę)."""
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout)
+        if r.status_code != 200:
+            print(f"  [RCL {r.status_code}] {url}")
+            return None
+        return r.text
+    except Exception as ex:
+        print(f"  [RCL błąd] {url}: {ex}")
+        return None
+
+
+def _rcl_projects():
+    """ETAP RZĄDOWY: projekty ustaw z wykazu RCL (legislacja.rcl.gov.pl),
+    zanim trafią do Sejmu. Brak API — parsujemy listę regexem (defensywnie)."""
+    out, seen = [], set()
+    base = "https://legislacja.rcl.gov.pl/lista?typeId=2"   # typeId=2 = projekty ustaw
+    for page in range(1, RCL_PAGES + 1):
+        url = base if page == 1 else f"{base}&page={page}"
+        html_text = _http_get_text(url, timeout=20)
+        if not html_text:
+            continue
+        # Każdy projekt: <a href="/projekt/12402157...">Tytuł</a>; numer (UD116) i data obok.
+        for m in re.finditer(r'href="(/projekt/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*</a>', html_text):
+            path = m.group(1)
+            if path in seen:
+                continue
+            title = re.sub(r"\s+", " ", html.unescape(m.group(2))).strip()
+            if not title or not _topic_ok(title):
+                continue
+            seen.add(path)
+            tail = html_text[m.end():m.end() + 600]
+            num = re.search(r"\b([A-Z]{2}\d{1,4})\b", tail)
+            dm = re.search(r"\b(\d{2})-(\d{2})-(\d{4})\b", tail)
+            date = None
+            if dm:
+                try:
+                    date = datetime.datetime(int(dm.group(3)), int(dm.group(2)), int(dm.group(1)),
+                                             tzinfo=datetime.timezone.utc).isoformat()
+                except Exception:
+                    date = None
+            sygn = num.group(1) if num else ""
+            out.append({
+                "title": title,
+                "link": "https://legislacja.rcl.gov.pl" + path,
+                "desc": ("Projekt rządowy" + (" · " + sygn if sygn else "")).strip(),
+                "summary": "", "date": date,
+                "src": "Rząd (RCL)", "cat": "Projekty", "color": "#8a5a2e",
+                "fid": "off-rcl", "official": True, "track": True,
+                "step": 1, "stage": "Prace w rządzie" + (" (" + sygn + ")" if sygn else ""),
+            })
+            if len(out) >= RCL_MAX:
+                break
+        if len(out) >= RCL_MAX:
+            break
+    print(f"  [Rząd (RCL)] dopasowano {len(out)} projektów rządowych.")
+    return out
+
+
 def _official_date_ok(iso: str) -> bool:
     """PROJEKTY pokazujemy tylko z sensowną, świeżą datą (nie z przyszłości,
     nie starszą niż okno). Odcina błędne daty typu 'rok 2206'."""
@@ -407,7 +478,7 @@ def _act_date_ok(iso: str) -> bool:
 
 
 # Cztery etapy sciezki legislacyjnej (do "schodkow" w kokpicie).
-LEGIS_STEPS = ["Projekt", "Sejm", "Prezydent", "Dz.U."]
+LEGIS_STEPS = ["Rząd", "Sejm", "Prezydent", "Dz.U."]
 
 
 def _process_stage(term, num):
@@ -421,7 +492,7 @@ def _process_stage(term, num):
 
     def _name(s):
         if isinstance(s, dict):
-            return s.get("stageName") or s.get("name") or ""
+            return str(s.get("stageName") or s.get("name") or "")
         return str(s) if s else ""
 
     last = _name(stages[-1]).strip()
@@ -430,16 +501,14 @@ def _process_stage(term, num):
 
 
 def _legis_step(allnames: str, published: bool) -> int:
-    """Na ktorym z 4 etapow jest ustawa (1..4). Wykrywanie po nazwach etapow."""
+    """Na ktorym z 4 etapow (Rzad→Sejm→Prezydent→Dz.U.) jest druk SEJMOWY.
+    Druk jest juz w Sejmie, wiec minimum to etap 2."""
     if published:
         return 4
     a = _norm(allnames or "")
     if "prezydent" in a or "podpis" in a:
         return 3
-    if ("senat" in a or "uchwal" in a or "glosowanie" in a
-            or "trzecie czytanie" in a or "3 czytanie" in a):
-        return 2
-    return 1
+    return 2
 
 
 def _topic_ok(title: str) -> bool:
@@ -509,7 +578,7 @@ def _sejm_prints():
             "date": date,
             "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
             "fid": "off-sejm", "official": True,
-            "track": True, "step": 1, "stage": "Projekt", "_num": num,
+            "track": True, "step": 2, "stage": "Wpłynęło do Sejmu", "_num": num,
         })
         if len(out) >= OFFICIAL_MAX:
             break
@@ -539,7 +608,8 @@ def fetch_official():
         return [], 0
     print("Pobieram źródła oficjalne (API Sejm/ELI)…")
     items = []
-    for label, getter in (("Dz.U.", lambda: _eli_items("DU")),
+    for label, getter in (("Rząd (RCL)", _rcl_projects),
+                          ("Dz.U.", lambda: _eli_items("DU")),
                           ("Monitor Polski", lambda: _eli_items("MP")),
                           ("Sejm — projekty", _sejm_prints)):
         try:
@@ -863,7 +933,7 @@ function renderChips(){
   });
 }
 
-const STEPS = ["Projekt","Sejm","Prezydent","Dz.U."];
+const STEPS = ["Rząd","Sejm","Prezydent","Dz.U."];
 function stepper(step){
   return `<div class="stepper">`+STEPS.map((s,i)=>{
     const on = (i < step) ? "on" : "";
@@ -1013,7 +1083,7 @@ def main():
     # własną sekcję "Ścieżka legislacyjna", więc nie dublujemy ich w chipach).
     chip_sources = [{"id": f["id"], "name": f["name"], "cat": f["cat"], "color": f["color"]} for f in FEEDS]
 
-    total_sources = len(FEEDS) + (3 if OFFICIAL_ENABLED else 0)
+    total_sources = len(FEEDS) + (4 if OFFICIAL_ENABLED else 0)  # +RCL, Dz.U., MP, Sejm
     out = pathlib.Path("public")
     out.mkdir(exist_ok=True)
     (out / "index.html").write_text(
