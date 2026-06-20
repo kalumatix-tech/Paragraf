@@ -16,6 +16,7 @@ import json
 import datetime
 import pathlib
 import unicodedata
+import urllib.parse
 
 import feedparser
 import requests
@@ -46,13 +47,21 @@ FEEDS = [
     # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
-    {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-    {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-    {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-    {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-    {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-    {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
 
+    # ============================================================== #
+    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -76,7 +85,7 @@ OFFICIAL_ENABLED = True
 SEJM_TERM = 10                 # kadencja Sejmu (zmien po nowych wyborach)
 OFFICIAL_MAX = 12             # ile PROJEKTOW (druki, z etapem) bierzemy z Sejmu
 ELI_MAX = 40                  # ile OPUBLIKOWANYCH aktow (Dz.U./MP) do wyszukiwarki ustaw
-RCL_MAX = 15                  # ile PROJEKTOW RZADOWYCH (RCL, przed Sejmem)
+RCL_MAX = 20                  # ile PROJEKTOW RZADOWYCH (RCL, przed Sejmem)
 RCL_PAGES = 4                 # ile stron listy RCL przejrzec (kazda ~10 pozycji)
 OFFICIAL_MAX_AGE_DAYS = 60    # okno swiezosci dla projektow (aktywne w procesie)
 
@@ -394,51 +403,65 @@ def _http_get_text(url: str, timeout: int = 25):
         return None
 
 
+def _rcl_parse_into(html_text, out, seen):
+    """Wyłuskuje projekty z jednej strony HTML listy RCL do out (deduplikacja po seen)."""
+    if not html_text:
+        return
+    for m in re.finditer(r'href="(/projekt/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*</a>', html_text):
+        path = m.group(1)
+        if path in seen:
+            continue
+        title = re.sub(r"\s+", " ", html.unescape(m.group(2))).strip()
+        if not title or not _topic_ok(title):
+            continue
+        seen.add(path)
+        tail = html_text[m.end():m.end() + 600]
+        # Numer (UD116 itp.) bierzemy z WŁASNEGO tytułu, żeby nie przykleić sąsiedniego.
+        num = re.search(r"\b([A-Z]{2}\d{1,4})\b", title)
+        dm = re.search(r"\b(\d{2})-(\d{2})-(\d{4})\b", tail)
+        date = None
+        if dm:
+            try:
+                date = datetime.datetime(int(dm.group(3)), int(dm.group(2)), int(dm.group(1)),
+                                         tzinfo=datetime.timezone.utc).isoformat()
+            except Exception:
+                date = None
+        sygn = num.group(1) if num else ""
+        out.append({
+            "title": title,
+            "link": "https://legislacja.rcl.gov.pl" + path,
+            "desc": ("Projekt rządowy" + (" · " + sygn if sygn else "")).strip(),
+            "summary": "", "date": date,
+            "src": "Rząd (RCL)", "cat": "Projekty", "color": "#8a5a2e",
+            "fid": "off-rcl", "official": True, "track": True,
+            "step": 1, "stage": "Prace w rządzie" + (" (" + sygn + ")" if sygn else ""),
+        })
+        if len(out) >= RCL_MAX:
+            return
+
+
 def _rcl_projects():
     """ETAP RZĄDOWY: projekty ustaw z wykazu RCL (legislacja.rcl.gov.pl),
-    zanim trafią do Sejmu. Brak API — parsujemy listę regexem (defensywnie)."""
+    zanim trafią do Sejmu. Brak API — parsujemy listę regexem (defensywnie).
+    Łączymy dwa źródła: (1) wyszukiwarkę RCL po słowach podatkowych — łapie też
+    STARSZE projekty (np. UD116), oraz (2) najnowsze strony listy."""
     out, seen = [], set()
     base = "https://legislacja.rcl.gov.pl/lista?typeId=2"   # typeId=2 = projekty ustaw
-    for page in range(1, RCL_PAGES + 1):
-        url = base if page == 1 else f"{base}&page={page}"
-        html_text = _http_get_text(url, timeout=20)
-        if not html_text:
-            continue
-        # Każdy projekt: <a href="/projekt/12402157...">Tytuł</a>; numer (UD116) i data obok.
-        for m in re.finditer(r'href="(/projekt/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*</a>', html_text):
-            path = m.group(1)
-            if path in seen:
-                continue
-            title = re.sub(r"\s+", " ", html.unescape(m.group(2))).strip()
-            if not title or not _topic_ok(title):
-                continue
-            seen.add(path)
-            tail = html_text[m.end():m.end() + 600]
-            num = re.search(r"\b([A-Z]{2}\d{1,4})\b", tail)
-            dm = re.search(r"\b(\d{2})-(\d{2})-(\d{4})\b", tail)
-            date = None
-            if dm:
-                try:
-                    date = datetime.datetime(int(dm.group(3)), int(dm.group(2)), int(dm.group(1)),
-                                             tzinfo=datetime.timezone.utc).isoformat()
-                except Exception:
-                    date = None
-            sygn = num.group(1) if num else ""
-            out.append({
-                "title": title,
-                "link": "https://legislacja.rcl.gov.pl" + path,
-                "desc": ("Projekt rządowy" + (" · " + sygn if sygn else "")).strip(),
-                "summary": "", "date": date,
-                "src": "Rząd (RCL)", "cat": "Projekty", "color": "#8a5a2e",
-                "fid": "off-rcl", "official": True, "track": True,
-                "step": 1, "stage": "Prace w rządzie" + (" (" + sygn + ")" if sygn else ""),
-            })
-            if len(out) >= RCL_MAX:
-                break
+    # (1) Wyszukiwarka RCL po kluczowych hasłach podatkowych
+    for kw in ("podatek", "VAT", "akcyza", "KSeF", "PIT", "CIT"):
         if len(out) >= RCL_MAX:
             break
+        url = f"{base}&searchString={urllib.parse.quote(kw)}"
+        _rcl_parse_into(_http_get_text(url, timeout=20), out, seen)
+    # (2) Najnowsze strony listy (świeży przegląd procesu)
+    for page in range(1, RCL_PAGES + 1):
+        if len(out) >= RCL_MAX:
+            break
+        url = base if page == 1 else f"{base}&page={page}"
+        _rcl_parse_into(_http_get_text(url, timeout=20), out, seen)
     print(f"  [Rząd (RCL)] dopasowano {len(out)} projektów rządowych.")
     return out
+
 
 
 def _official_date_ok(iso: str) -> bool:
@@ -772,6 +795,20 @@ TEMPLATE = r'''<!DOCTYPE html>
     font-size:13px;font-weight:600;color:var(--ink-soft);transition:.15s}
   .showall:hover{border-color:var(--ink-faint);color:var(--ink)}
 
+  /* --- Wyszukiwanie na żywo --- */
+  .searchrow{display:flex;gap:8px;align-items:stretch}
+  .searchrow .search{flex:1}
+  .livebtn{flex:none;border:1px solid var(--accent);background:var(--accent);color:#f3e9df;border-radius:12px;
+    padding:0 18px;font-family:var(--sans);font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+  .livebtn:hover{filter:brightness(1.08)}
+  .livebtn:disabled{opacity:.55;cursor:wait}
+  .livehint{margin:9px 2px 0;font-size:12px;color:var(--ink-faint);line-height:1.5}
+  .livehint b{color:var(--ink-soft)}
+  #liveResults{margin:20px 0}
+  #liveResults:empty{display:none}
+  .live-status{padding:16px;border:1px dashed var(--line);border-radius:var(--radius);color:var(--ink-soft);font-size:13.5px;text-align:center}
+  .live-sec-head{font-family:var(--serif);font-size:17px;font-weight:600;color:var(--ink);margin:0 0 12px;padding-bottom:9px;border-bottom:2px solid var(--accent)}
+
   /* --- Ścieżka legislacyjna --- */
   #legis{margin-bottom:30px}
   .lsec-head{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
@@ -848,9 +885,14 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <section id="legisView" hidden>
       <div class="controls">
-        <input class="search" id="searchL" type="text" placeholder="Szukaj w ustawach i projektach: VAT, akcyza, KSeF, nr druku…" autocomplete="off">
+        <div class="searchrow">
+          <input class="search" id="searchL" type="text" placeholder="Szukaj ustawy / projektu / nr druku…  (Enter = na żywo)" autocomplete="off">
+          <button class="livebtn" id="liveBtn" title="Pobierz na żywo z Dziennika Ustaw i RCL">Szukaj na żywo</button>
+        </div>
+        <p class="livehint">Pisanie filtruje na bieżąco to, co już pobrane. <b>„Szukaj na żywo"</b> (albo Enter) odpytuje Dziennik Ustaw i RCL w czasie rzeczywistym — znajdzie też starsze rzeczy, jak UD116.</p>
       </div>
 
+      <div id="liveResults"></div>
       <section id="legis"></section>
     </section>
 
@@ -946,6 +988,59 @@ function legisCard(it){
 
 const LEGIS_DEFAULT = 18;
 
+// ---- WYSZUKIWANIE NA ŻYWO (Dz.U. + RCL) ----
+// Statyczna strona nie ma serwera, więc próbujemy bezpośrednio, a gdy
+// przeglądarka zablokuje (CORS) — przez darmowy przekaźnik. Dane publiczne.
+const PROXIES = [
+  u => u,
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+];
+async function getJSON(u){
+  for(const p of PROXIES){ try{ const r=await fetch(p(u)); if(r.ok) return await r.json(); }catch(e){} }
+  return null;
+}
+async function getText(u){
+  for(const p of [PROXIES[1],PROXIES[2],PROXIES[0]]){ try{ const r=await fetch(p(u)); if(r.ok) return await r.text(); }catch(e){} }
+  return null;
+}
+async function liveSearch(){
+  const q=((state.qL!==undefined?state.qL:"")||$("#searchL").value||"").trim();
+  const box=$("#liveResults"), btn=$("#liveBtn");
+  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki, potem „Szukaj na żywo".</div>`; return; }
+  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam na żywo w Dzienniku Ustaw i RCL…</div>`;
+  const out=[];
+  try{
+    for(const pub of ["DU","MP"]){
+      const data=await getJSON(`https://api.sejm.gov.pl/eli/acts/search?title=${encodeURIComponent(q)}&publisher=${pub}&limit=15`);
+      if(data && Array.isArray(data.items)){
+        for(const a of data.items.slice(0,15)){
+          if(!a||!a.title) continue;
+          out.push({title:a.title, link:a.ELI?`https://api.sejm.gov.pl/eli/acts/${a.ELI}/text.pdf`:"#",
+            src:pub==="DU"?"Dziennik Ustaw":"Monitor Polski", color:pub==="DU"?"#1d3a6b":"#0f5c4a",
+            stage:"Opublikowano", step:4, _d:pd(a.announcementDate||null)});
+        }
+      }
+    }
+    const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&searchString=${encodeURIComponent(q)}`);
+    if(htmlTxt){
+      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*<\/a>/g; let m; const seen=new Set();
+      while((m=re.exec(htmlTxt))){
+        if(seen.has(m[1])) continue; seen.add(m[1]);
+        out.push({title:m[2].replace(/\s+/g," ").trim(), link:"https://legislacja.rcl.gov.pl"+m[1],
+          src:"Rząd (RCL)", color:"#8a5a2e", stage:"Prace w rządzie", step:1, _d:null});
+        if(seen.size>=20) break;
+      }
+    }
+  }catch(e){}
+  btn.disabled=false;
+  if(!out.length){
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem na żywo dla „${esc(q)}". Spróbuj innego słowa lub numeru. Jeśli to się powtarza — przekaźnik danych mógł chwilowo nie odpowiedzieć, kliknij jeszcze raz.</div>`;
+    return;
+  }
+  box.innerHTML=`<div class="live-sec-head">Wyniki na żywo dla „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
+}
+
 function renderNews(){
   const vis=newsVisible(); const feed=$("#feed");
   if(!vis.length){
@@ -1004,6 +1099,8 @@ function switchTab(t){
   if(b){ $("#stTime").textContent=b.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"}); $("#stDate").textContent=PL.format(b); }
   let t1;$("#search").oninput=e=>{state.q=e.target.value;clearTimeout(t1);t1=setTimeout(render,160)};
   let t2;$("#searchL").oninput=e=>{state.qL=e.target.value;clearTimeout(t2);t2=setTimeout(render,160)};
+  $("#liveBtn").onclick=liveSearch;
+  $("#searchL").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); liveSearch(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   renderChips(); render();
 })();
