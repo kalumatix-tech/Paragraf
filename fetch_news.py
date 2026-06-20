@@ -82,8 +82,9 @@ AI_FILTER = False
 # ------------------------------------------------------------------ #
 OFFICIAL_ENABLED = True
 SEJM_TERM = 10                 # kadencja Sejmu (zmien po nowych wyborach)
-OFFICIAL_MAX = 12             # ile najnowszych pozycji z KAZDEGO zrodla oficjalnego
-OFFICIAL_MAX_AGE_DAYS = 60    # akty prawne pokazujemy dluzej niz newsy (rzadziej wychodza)
+OFFICIAL_MAX = 12             # ile PROJEKTOW (druki, z etapem) bierzemy z Sejmu
+ELI_MAX = 40                  # ile OPUBLIKOWANYCH aktow (Dz.U./MP) do wyszukiwarki ustaw
+OFFICIAL_MAX_AGE_DAYS = 60    # okno swiezosci dla projektow (aktywne w procesie)
 
 OFFICIAL_SRC = {
     "du":   {"name": "Dziennik Ustaw",  "cat": "Legislacja", "color": "#1d3a6b"},
@@ -387,7 +388,7 @@ def _api_get(url: str, timeout: int = 25):
 
 
 def _official_date_ok(iso: str) -> bool:
-    """Akt pokazujemy tylko, gdy ma sensowną, świeżą datę (nie z przyszłości,
+    """PROJEKTY pokazujemy tylko z sensowną, świeżą datą (nie z przyszłości,
     nie starszą niż okno). Odcina błędne daty typu 'rok 2206'."""
     if not iso:
         return False
@@ -395,6 +396,21 @@ def _official_date_ok(iso: str) -> bool:
         d = datetime.datetime.fromisoformat(iso)
         days = (datetime.datetime.now(datetime.timezone.utc) - d).days
         return -1 <= days <= OFFICIAL_MAX_AGE_DAYS
+    except Exception:
+        return False
+
+
+def _act_date_ok(iso: str) -> bool:
+    """OPUBLIKOWANE akty do wyszukiwarki — szersze okno (cały rok), ale nadal
+    odrzuca przyszłe/błędne roczniki (np. '2206')."""
+    if not iso:
+        return False
+    try:
+        d = datetime.datetime.fromisoformat(iso)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if (d - now).days > 1:          # nie z przyszłości
+            return False
+        return now.year - 1 <= d.year <= now.year + 1
     except Exception:
         return False
 
@@ -455,7 +471,7 @@ def _eli_items(pub: str):
         if not title or not _topic_ok(title):
             continue
         date = _date_iso(a.get("announcementDate") or a.get("changeDate", "")[:10])
-        if not _official_date_ok(date):
+        if not _act_date_ok(date):
             continue
         eli = a.get("ELI", "")
         parts = eli.split("/")
@@ -471,7 +487,7 @@ def _eli_items(pub: str):
             "fid": "off-" + ("du" if pub == "DU" else "mp"), "official": True,
             "track": True, "step": 4, "stage": "Opublikowano",
         })
-        if len(out) >= OFFICIAL_MAX:
+        if len(out) >= ELI_MAX:
             break
     print(f"  [{meta['name']}] dopasowano {len(out)} aktów.")
     return out
@@ -682,6 +698,20 @@ TEMPLATE = r'''<!DOCTYPE html>
   footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint);line-height:1.6}
   footer b{color:var(--ink-soft)}
 
+  /* --- Zakładki --- */
+  .tabs{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+  .tab{appearance:none;border:none;background:none;cursor:pointer;font-family:var(--sans);
+    font-size:14.5px;font-weight:600;color:var(--ink-faint);padding:10px 16px;position:relative;
+    border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+  .tab:hover{color:var(--ink-soft)}
+  .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  [hidden]{display:none!important}
+  .showall{display:block;width:100%;margin-top:16px;padding:11px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);cursor:pointer;font-family:var(--sans);
+    font-size:13px;font-weight:600;color:var(--ink-soft);transition:.15s}
+  .showall:hover{border-color:var(--ink-faint);color:var(--ink)}
+
   /* --- Ścieżka legislacyjna --- */
   #legis{margin-bottom:30px}
   .lsec-head{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
@@ -740,20 +770,33 @@ TEMPLATE = r'''<!DOCTYPE html>
   </header>
 
   <div class="wrap">
-    <div class="controls">
-      <input class="search" id="search" type="text" placeholder="Szukaj: VAT, KSeF, estoński CIT, ZUS, orzeczenie…" autocomplete="off">
-      <div class="chips" id="chips"></div>
-    </div>
+    <nav class="tabs">
+      <button class="tab on" data-tab="news">Wiadomości</button>
+      <button class="tab" data-tab="legis">Ustawy</button>
+    </nav>
 
-    {SUMMARY}
+    <section id="newsView">
+      <div class="controls">
+        <input class="search" id="search" type="text" placeholder="Szukaj: VAT, KSeF, estoński CIT, ZUS, orzeczenie…" autocomplete="off">
+        <div class="chips" id="chips"></div>
+      </div>
 
-    <section id="legis"></section>
+      {SUMMARY}
 
-    <main id="feed"></main>
+      <main id="feed"></main>
+    </section>
+
+    <section id="legisView" hidden>
+      <div class="controls">
+        <input class="search" id="searchL" type="text" placeholder="Szukaj w ustawach i projektach: VAT, akcyza, KSeF, nr druku…" autocomplete="off">
+      </div>
+
+      <section id="legis"></section>
+    </section>
 
     <footer>
       <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — w jednym miejscu.<br>
-      <b>Ścieżka legislacyjna</b> (na górze) pokazuje drogę ustaw podatkowych: Projekt → Sejm → Prezydent → Dziennik Ustaw, wprost z oficjalnego API Sejmu. Niżej — wiadomości z portali (chipem włączasz/wyłączasz źródło; wybór zapamiętuje przeglądarka).
+      Zakładka <b>Ustawy</b> pokazuje ścieżkę legislacyjną (Projekt → Sejm → Prezydent → Dz.U.) wprost z oficjalnego API Sejmu i pozwala przeszukać akty. Zakładka <b>Wiadomości</b> — artykuły z portali (chipem włączasz/wyłączasz źródło; wybór zapamiętuje przeglądarka).
     </footer>
   </div>
 
@@ -761,7 +804,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"" };
+const state = { off:new Set(), q:"", qL:"", tab:"news" };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 const presentIds = new Set(DATA.map(d=>d.fid));
@@ -793,11 +836,19 @@ function ago(d){
   if(k===1)return "wczoraj";if(k<8)return k+" dni temu";return PL.format(d);
 }
 
-function visible(){
+function newsVisible(){
   const q=state.q.trim().toLowerCase();
   return DATA
+    .filter(it=>!it.track)
     .filter(it=>!state.off.has(it.fid))
     .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat).toLowerCase().includes(q))
+    .map(it=>({...it,_d:pd(it.date)}));
+}
+function legisVisible(){
+  const q=state.qL.trim().toLowerCase();
+  return DATA
+    .filter(it=>it.track)
+    .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat+" "+(it.stage||"")).toLowerCase().includes(q))
     .map(it=>({...it,_d:pd(it.date)}));
 }
 
@@ -833,29 +884,16 @@ function legisCard(it){
   </article>`;
 }
 
-function render(){
-  const vis=visible();
-  $("#stCount").textContent=vis.length;
-  const L=$("#legis"), feed=$("#feed");
+const LEGIS_DEFAULT = 18;
+
+function renderNews(){
+  const vis=newsVisible(); const feed=$("#feed");
   if(!vis.length){
-    L.style.display="none"; L.innerHTML="";
-    feed.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak wyników</h3><p>Zmień frazę albo włącz więcej źródeł powyżej.</p></div>`;
-    return;
+    feed.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak wiadomości</h3><p>Zmień frazę albo włącz więcej źródeł powyżej.</p></div>`;
+    return 0;
   }
-  const track=vis.filter(it=>it.track), news=vis.filter(it=>!it.track);
-
-  // --- Ścieżka legislacyjna ---
-  if(track.length){
-    L.style.display="";
-    L.innerHTML=`<div class="lsec-head"><span class="lt">Ścieżka legislacyjna</span>`
-      +`<span class="lcount">${track.length} ${track.length===1?'ustawa':'ustaw'}</span></div>`
-      +`<div class="lgrid">${track.map(legisCard).join("")}</div>`;
-  } else { L.style.display="none"; L.innerHTML=""; }
-
-  // --- Wiadomości (grupowane dniami) ---
-  if(!news.length){ feed.innerHTML=""; return; }
   let h="",last=null;
-  for(const it of news){
+  for(const it of vis){
     const k=dayKey(it._d);
     if(k!==last){h+=`<div class="daysep"><span class="lab">${esc(dayLabel(it._d))}</span><span class="rule"></span></div>`;last=k;}
     h+=`<article class="card" style="--ccol:${it.color}">
@@ -865,13 +903,48 @@ function render(){
       <div class="meta">${esc(ago(it._d))||"—"}</div>
     </article>`;
   }
-  feed.innerHTML=h;
+  feed.innerHTML=h; return vis.length;
+}
+
+function renderLegis(){
+  const all=legisVisible(); const L=$("#legis");
+  const searching = state.qL.trim().length>0;
+  if(!all.length){
+    L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak ustaw</h3><p>${searching?'Nic nie pasuje do tej frazy.':'Brak świeżych aktów i projektów.'}</p></div>`;
+    return 0;
+  }
+  const show = searching ? all : all.slice(0, LEGIS_DEFAULT);
+  let h=`<div class="lsec-head"><span class="lt">${searching?'Wyniki wyszukiwania':'Ścieżka legislacyjna'}</span>`
+    +`<span class="lcount">${searching?(all.length+' znalezionych'):(all.length+' śledzonych')}</span></div>`
+    +`<div class="lgrid">${show.map(legisCard).join("")}</div>`;
+  if(!searching && all.length>LEGIS_DEFAULT){
+    h+=`<button class="showall" id="showAll">Pokaż wszystkie (${all.length})</button>`;
+  }
+  L.innerHTML=h;
+  const sa=$("#showAll");
+  if(sa) sa.onclick=()=>{ L.querySelector(".lgrid").innerHTML=all.map(legisCard).join(""); sa.remove(); };
+  return all.length;
+}
+
+function render(){
+  const nc=renderNews(); const lc=renderLegis();
+  $("#stCount").textContent = (state.tab==="legis") ? lc : nc;
+}
+
+function switchTab(t){
+  state.tab=t;
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
+  $("#newsView").hidden = (t!=="news");
+  $("#legisView").hidden = (t!=="legis");
+  render();
 }
 
 (function init(){
   const b=BUILT?new Date(BUILT):null;
   if(b){ $("#stTime").textContent=b.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"}); $("#stDate").textContent=PL.format(b); }
-  let t;$("#search").oninput=e=>{state.q=e.target.value;clearTimeout(t);t=setTimeout(render,160)};
+  let t1;$("#search").oninput=e=>{state.q=e.target.value;clearTimeout(t1);t1=setTimeout(render,160)};
+  let t2;$("#searchL").oninput=e=>{state.qL=e.target.value;clearTimeout(t2);t2=setTimeout(render,160)};
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   renderChips(); render();
 })();
 </script>
@@ -883,7 +956,7 @@ function render(){
 # ------------------------------------------------------------------ #
 #  RENDEROWANIE                                                       #
 # ------------------------------------------------------------------ #
-def render(items, feeds, summary, live):
+def render(items, feeds, summary, live, total):
     built = datetime.datetime.now(datetime.timezone.utc).isoformat()
     summary_html = ""
     if summary:
@@ -905,7 +978,7 @@ def render(items, feeds, summary, live):
             .replace("{FEEDS}", safe(feeds))
             .replace("{BUILT}", built)
             .replace("{LIVE}", str(live))
-            .replace("{TOTAL}", str(len(feeds)))
+            .replace("{TOTAL}", str(total))
             .replace("{TOTAL_ITEMS}", str(len(items)))
             .replace("{SUMMARY}", summary_html))
 
@@ -917,8 +990,12 @@ def main():
     items += oitems
     items.sort(key=lambda it: it["date"] or "", reverse=True)
     print(f"Pobrano {len(items)} pozycji z {live + olive} źródeł (w tym {olive} oficjalnych). Odsiewam…")
-    items = apply_filters(items)[:MAX_ITEMS]
-    print(f"Po odsiewie zostaje {len(items)} pozycji.")
+    filtered = apply_filters(items)
+    official = [it for it in filtered if it.get("official")]
+    news = [it for it in filtered if not it.get("official")][:MAX_ITEMS]
+    items = official + news
+    items.sort(key=lambda it: it["date"] or "", reverse=True)
+    print(f"Po odsiewie: {len(news)} wiadomości + {len(official)} aktów/projektów.")
     if AI_FILTER:
         items = ai_filter_relevance(items)  # (odlozone) z kluczem: tylko scisle podatkowe newsy
     summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
@@ -928,9 +1005,11 @@ def main():
     # własną sekcję "Ścieżka legislacyjna", więc nie dublujemy ich w chipach).
     chip_sources = [{"id": f["id"], "name": f["name"], "cat": f["cat"], "color": f["color"]} for f in FEEDS]
 
+    total_sources = len(FEEDS) + (3 if OFFICIAL_ENABLED else 0)
     out = pathlib.Path("public")
     out.mkdir(exist_ok=True)
-    (out / "index.html").write_text(render(items, chip_sources, summary, live + olive), encoding="utf-8")
+    (out / "index.html").write_text(
+        render(items, chip_sources, summary, live + olive, total_sources), encoding="utf-8")
     print("Zapisano public/index.html — gotowe.")
 
 
