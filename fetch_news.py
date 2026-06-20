@@ -25,42 +25,42 @@ import requests
 #  (uzywamy AKTYWNEGO wzoru ".feed" — stare adresy rss.* byly martwe) #
 # ------------------------------------------------------------------ #
 FEEDS = [
-    # --- INFOR (potwierdzone, świeże) ---
+    # ============================================================== #
+    #  ZASADA: tylko DZIALY scisle podatkowo-prawne, NIE cale gazety. #
+    #  Cale portale (rp.pl, money, wprost, BI) wpuszczaly kulture,    #
+    #  sport i film ("Plus Minus") — dlatego ich tu NIE ma.           #
+    # ============================================================== #
+
+    # --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
     {"id": "infor-ks", "name": "INFOR Księgowość",    "cat": "Podatki", "color": "#8a2e2a",
      "url": "https://ksiegowosc.infor.pl/.feed"},
     {"id": "infor-pr", "name": "INFOR Prawo",          "cat": "Prawo",   "color": "#1b5e57",
      "url": "https://www.infor.pl/prawo/.feed"},
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
-    {"id": "infor-mf", "name": "INFOR Moja firma",     "cat": "Biznes",  "color": "#2e6e8c",
-     "url": "https://mojafirma.infor.pl/.feed"},
 
-    # --- Pozostałe portale (potwierdzone, że żyją i publikują w 2026) ---
-    {"id": "bankier",  "name": "Bankier.pl",           "cat": "Finanse", "color": "#9a6b2e",
-     "url": "https://www.bankier.pl/rss/finanse.xml"},
-    {"id": "money",    "name": "Money.pl",             "cat": "Finanse", "color": "#2e7d6b",
-     "url": "https://www.money.pl/rss/"},
-    {"id": "bi",       "name": "Business Insider",     "cat": "Biznes",  "color": "#6b6b2a",
-     "url": "https://businessinsider.com.pl/.feed"},
+    # --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
+    {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
+     "url": "https://interpretacje-podatkowe.org/feed"},
 
-    # --- Dodane na życzenie; adres "na próbę" (sprawdź licznik w logu Actions;
-    #     jeśli pokaże [pusto], zakomentuj daną linię znakiem #) ---
-    {"id": "wprost",   "name": "Wprost",               "cat": "Biznes",  "color": "#8a4a2e",
-     "url": "https://www.wprost.pl/rss.xml"},
-    {"id": "rp",       "name": "Rzeczpospolita",       "cat": "Prawo",   "color": "#4a4a8a",
-     "url": "https://www.rp.pl/rss/1019"},
+    # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
 
-    # ---------------------------------------------------------------- #
-    #  NIE DZIAŁAJĄ JAKO RSS (zostawiam dla jasności):
-    #  • Gazeta Prawna — kanał MARTWY, zamarł w lutym 2026 (sprawdzone).
-    #    Tę samą treść masz w INFOR (ten sam wydawca wydaje Dz.G.Prawną).
-    #  • Prawo.pl (Wolters Kluwer) — brak publicznego kanału RSS.
-    #  Gdyby któryś kiedyś ożył, wystarczy odkomentować:
-    # ---------------------------------------------------------------- #
-    # {"id": "gp-pr", "name": "Gazeta Prawna · Prawo", "cat": "Prawo", "color": "#5b4b8a",
-    #  "url": "http://rss.gazetaprawna.pl/GazetaPrawna-Prawo"},
+    # ============================================================== #
+    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -70,6 +70,10 @@ UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
 # ILE najnowszych artykulow ma dostac streszczenie AI (2 zdania w karcie).
 # Dziala TYLKO, gdy ustawiony jest sekret ANTHROPIC_API_KEY. 0 = wylacz.
 SUMMARIZE_TOP = 18
+
+# Filtr trafnosci AI — ODLOZONY (najpierw domykamy dzialy/daty bez AI).
+# Gdy zechcesz: ustaw True (wymaga sekretu ANTHROPIC_API_KEY).
+AI_FILTER = False
 
 # ------------------------------------------------------------------ #
 #  ZRODLA OFICJALNE (publiczne API Kancelarii Sejmu — bez klucza)     #
@@ -676,6 +680,16 @@ const presentIds = new Set(DATA.map(d=>d.fid));
 
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 const PL = new Intl.DateTimeFormat("pl-PL",{day:"numeric",month:"long",year:"numeric"});
+const NOW_Y = new Date().getFullYear();
+// Twarda walidacja daty: odrzuca bledne/przyszle roczniki (np. "2206").
+function pd(s){
+  if(!s) return null;
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  if(y < 2015 || y > NOW_Y + 1) return null;
+  return d;
+}
 function dayKey(d){return d?d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate():"x"}
 function dayLabel(d){
   if(!d) return "Bez daty";
@@ -696,7 +710,7 @@ function visible(){
   return DATA
     .filter(it=>!state.off.has(it.fid))
     .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat).toLowerCase().includes(q))
-    .map(it=>({...it,_d:it.date?new Date(it.date):null}));
+    .map(it=>({...it,_d:pd(it.date)}));
 }
 
 function renderChips(){
@@ -785,7 +799,8 @@ def main():
     print(f"Pobrano {len(items)} pozycji z {live + olive} źródeł (w tym {olive} oficjalnych). Odsiewam…")
     items = apply_filters(items)[:MAX_ITEMS]
     print(f"Po odsiewie zostaje {len(items)} pozycji.")
-    items = ai_filter_relevance(items)  # z kluczem AI: zostają tylko ściśle podatkowe newsy
+    if AI_FILTER:
+        items = ai_filter_relevance(items)  # (odlozone) z kluczem: tylko scisle podatkowe newsy
     summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
     summary = ai_summary(items)        # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
 
