@@ -88,12 +88,12 @@ OFFICIAL_SRC = {
 }
 
 # Z urzedowego "firehose'a" (wszystkie akty/projekty) przepuszczamy tylko te,
-# ktorych TYTUL pasuje tematycznie. Rdzenie slow (jak w BLOCK/FOCUS).
+# ktorych TYTUL pasuje SCISLE podatkowo/fiskalnie. Rdzenie slow (jak w BLOCK/FOCUS).
+# (Swiadomie waskie — wczesniej "oplat"/"finans"/"budzet" wpuszczaly kulture i oswiate.)
 OFFICIAL_TOPICS = [
-    "podatk", "vat", "cit", "pit", "akcyz", "ryczałt", "składk", "ubezpiecz",
-    "zus", "rachunkow", "ordynacj", "finans", "opłat", "cło", "celn", "faktur",
-    "ksef", "jpk", "danin", "skarbow", "przedsiębiorc", "działalnoś", "spółk",
-    "upadłoś", "restrukturyzacj", "wynagrodz", "emerytur", "gospodarcz", "budżet",
+    "podatk", "vat", "cit", "pit", "akcyz", "ryczałt", "ordynacj", "składk",
+    "zus", "rachunkow", "cło", "celn", "faktur", "ksef", "jpk", "danin",
+    "skarbow", "fiskus", "schemat podatk", "doradc podatkow",
 ]
 
 # ------------------------------------------------------------------ #
@@ -121,17 +121,15 @@ BLOCK = [
     "mecz", "piłk", "rozrywk", "quiz", "kupon", "promo", "black friday",
 ]
 
-# 3) BIALA LISTA: zostaja TYLKO wpisy zawierajace ktorys z tych rdzeni.
-#    WLACZONA, bo doszly szerokie portale (Money, Wprost, Business Insider,
-#    Rzeczpospolita), ktore pisza o wszystkim — biala lista trzyma kokpit
-#    przy temacie podatkowo-prawnym. Chcesz widziec WSZYSTKO z tych portali?
-#    Ustaw: FOCUS = []   (zrodla oficjalne maja wlasny filtr i jej NIE podlegaja)
+# 3) BIALA LISTA (slownikowa) — dziala TYLKO gdy NIE masz klucza AI.
+#    Z kluczem AI relevancje ocenia model (ponizej), wiec ta lista jest pomijana.
+#    Scisle podatkowa: bez rdzenia "ustaw" (lapal kazda ustawe!) i bez ogolnych
+#    terminow prawnych/biznesowych. Chcesz widziec WSZYSTKO? Ustaw FOCUS = [].
 FOCUS = [
-    "vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg", "ordynacj",
-    "ustaw", "nowelizacj", "interpretacj", "orzeczeni", "wyrok", "nsa", "tsue",
-    "fiskus", "skarbow", "akcyz", "ryczałt", "faktur", "jpk", "doręczeni",
-    "deklaracj", "rozliczeni", "danin", "opłat", "ministerstwo finansów",
-    "rachunkow", "działalnoś", "przedsiębiorc", "spółk", "kontrol skarbow",
+    "vat", "cit", "pit", "ksef", "jpk", "podatk", "akcyz", "ryczałt", "ordynacj",
+    "składk", "zus", "danin", "faktur", "fiskus", "skarbow", "schemat podatk",
+    "mdr", "rachunkow", "interpretacj", "deklaracj", "doradc podatkow",
+    "ministerstwo finansów", "estoński",
 ]
 
 
@@ -211,8 +209,9 @@ def fetch_all():
 
 
 def apply_filters(items):
-    """Świeżość + czarna lista + opcjonalna biała lista + odsiew duplikatów."""
+    """Świeżość + czarna lista + biała lista (gdy brak AI) + odsiew duplikatów."""
     now = datetime.datetime.now(datetime.timezone.utc)
+    has_ai = bool(os.environ.get("ANTHROPIC_API_KEY"))   # z AI relevancję oceni model
     seen = set()
     out = []
     dropped_age = dropped_block = dropped_focus = dropped_dup = 0
@@ -236,8 +235,8 @@ def apply_filters(items):
             dropped_block += 1
             continue
 
-        # --- biała lista (nie dotyczy źródeł oficjalnych — mają własny filtr) ---
-        if FOCUS and not it.get("official") and not any(_hit(hay, w) for w in FOCUS):
+        # --- biała lista słownikowa: tylko gdy NIE ma AI (i nie dla oficjalnych) ---
+        if FOCUS and not has_ai and not it.get("official") and not any(_hit(hay, w) for w in FOCUS):
             dropped_focus += 1
             continue
 
@@ -383,6 +382,19 @@ def _api_get(url: str):
         return None
 
 
+def _official_date_ok(iso: str) -> bool:
+    """Akt pokazujemy tylko, gdy ma sensowną, świeżą datę (nie z przyszłości,
+    nie starszą niż okno). Odcina błędne daty typu 'rok 2206'."""
+    if not iso:
+        return False
+    try:
+        d = datetime.datetime.fromisoformat(iso)
+        days = (datetime.datetime.now(datetime.timezone.utc) - d).days
+        return -1 <= days <= OFFICIAL_MAX_AGE_DAYS
+    except Exception:
+        return False
+
+
 def _topic_ok(title: str) -> bool:
     hay = " " + _norm(title) + " "
     return any(_hit(hay, w) for w in OFFICIAL_TOPICS)
@@ -402,6 +414,9 @@ def _eli_items(pub: str):
         title = (a.get("title") or "").strip()
         if not title or not _topic_ok(title):
             continue
+        date = _date_iso(a.get("announcementDate") or a.get("changeDate", "")[:10])
+        if not _official_date_ok(date):
+            continue
         eli = a.get("ELI", "")
         parts = eli.split("/")
         link = (f"https://api.sejm.gov.pl/eli/acts/{eli}/text.pdf" if len(parts) == 3
@@ -411,7 +426,7 @@ def _eli_items(pub: str):
         desc = (typ + " · " + sig).strip(" ·")
         out.append({
             "title": title, "link": link, "desc": desc, "summary": "",
-            "date": _date_iso(a.get("announcementDate") or a.get("changeDate", "")[:10]),
+            "date": date,
             "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
             "fid": "off-" + ("du" if pub == "DU" else "mp"), "official": True,
         })
@@ -436,11 +451,14 @@ def _sejm_prints():
         num = str(p.get("number", "")).strip()
         if not title or not num or not _topic_ok(title):
             continue
+        date = _date_iso((p.get("documentDate") or p.get("changeDate") or "")[:10])
+        if not _official_date_ok(date):
+            continue
         out.append({
             "title": title,
             "link": f"https://api.sejm.gov.pl/sejm/term{SEJM_TERM}/prints/{num}/{num}.pdf",
             "desc": f"Druk sejmowy nr {num}", "summary": "",
-            "date": _date_iso((p.get("documentDate") or p.get("changeDate") or "")[:10]),
+            "date": date,
             "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
             "fid": "off-sejm", "official": True,
         })
@@ -457,6 +475,54 @@ def fetch_official():
     items = _eli_items("DU") + _eli_items("MP") + _sejm_prints()
     live = len({it["fid"] for it in items})
     return items, live
+
+
+# ------------------------------------------------------------------ #
+#  FILTR AI RELEVANCJI — zostawia tylko ŚCIŚLE podatkowe newsy.       #
+#  Jedno zbiorcze zapytanie do modelu. Bez klucza: pomijany (zostaje  #
+#  filtr slownikowy FOCUS). Przy bledzie: nie odsiewa (bezpiecznie).  #
+# ------------------------------------------------------------------ #
+def ai_filter_relevance(items):
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        return items
+    cand = [it for it in items if not it.get("official")]
+    if not cand:
+        return items
+    listing = "\n".join(f"{i}. {it['title']}" for i, it in enumerate(cand))
+    prompt = (
+        "Poniżej ponumerowana lista nagłówków. Zwróć TYLKO numery tych, które dotyczą "
+        "ŚCIŚLE polskich PODATKÓW lub rozliczeń podatkowych: VAT, CIT, PIT, akcyza, ryczałt, "
+        "KSeF, JPK, schematy podatkowe / MDR, ordynacja podatkowa, interpretacje i orzeczenia "
+        "podatkowe, kontrole skarbowe, ulgi i odliczenia, składki ZUS/zdrowotne w ujęciu rozliczeń, "
+        "zmiany ustaw podatkowych i ich podpisanie przez prezydenta. "
+        "NIE zaliczaj: ogólnej polityki, prawa pracy/kodeksu pracy samego w sobie, kultury, oświaty, "
+        "ogólnej gospodarki, giełdy, rynków, biznesu bez wyraźnego wątku podatkowego. "
+        "Odpowiedz wyłącznie numerami oddzielonymi przecinkami (np. 0,3,7). Bez żadnych słów.\n\n"
+        + listing
+    )
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 500,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=45,
+        )
+        data = r.json()
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        keep = {int(x) for x in re.findall(r"\d+", text)}
+        if not keep:
+            print("  [AI filtr] brak trafień — nie odsiewam (zostawiam wszystko)")
+            return items
+        approved = {id(cand[i]) for i in keep if 0 <= i < len(cand)}
+        before = len(cand)
+        result = [it for it in items if it.get("official") or id(it) in approved]
+        print(f"  [AI filtr] ściśle podatkowe: {len(approved)}/{before} newsów")
+        return result
+    except Exception as ex:
+        print(f"  [AI filtr błąd] {ex} — nie odsiewam")
+        return items
 
 
 # ------------------------------------------------------------------ #
@@ -619,6 +685,7 @@ function dayLabel(d){
 }
 function ago(d){
   if(!d)return "";const s=(Date.now()-d.getTime())/1000;
+  if(s<0)return PL.format(d);
   if(s<60)return "przed chwilą";if(s<3600)return Math.floor(s/60)+" min temu";
   if(s<86400)return Math.floor(s/3600)+" godz. temu";const k=Math.floor(s/86400);
   if(k===1)return "wczoraj";if(k<8)return k+" dni temu";return PL.format(d);
@@ -718,6 +785,7 @@ def main():
     print(f"Pobrano {len(items)} pozycji z {live + olive} źródeł (w tym {olive} oficjalnych). Odsiewam…")
     items = apply_filters(items)[:MAX_ITEMS]
     print(f"Po odsiewie zostaje {len(items)} pozycji.")
+    items = ai_filter_relevance(items)  # z kluczem AI: zostają tylko ściśle podatkowe newsy
     summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
     summary = ai_summary(items)        # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
 
