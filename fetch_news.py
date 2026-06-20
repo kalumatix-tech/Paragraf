@@ -47,14 +47,20 @@ FEEDS = [
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
 
- 
-    {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
-     Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
+    # ============================================================== #
+    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -541,7 +547,14 @@ def fetch_official():
     if not OFFICIAL_ENABLED:
         return [], 0
     print("Pobieram źródła oficjalne (API Sejm/ELI)…")
-    items = _eli_items("DU") + _eli_items("MP") + _sejm_prints()
+    items = []
+    for label, getter in (("Dz.U.", lambda: _eli_items("DU")),
+                          ("Monitor Polski", lambda: _eli_items("MP")),
+                          ("Sejm — projekty", _sejm_prints)):
+        try:
+            items += getter()
+        except Exception as e:
+            print(f"  [oficjalne: {label} POMINIĘTE z powodu błędu] {e}")
     live = len({it["fid"] for it in items})
     return items, live
 
@@ -991,9 +1004,19 @@ def main():
     items.sort(key=lambda it: it["date"] or "", reverse=True)
     print(f"Po odsiewie: {len(news)} wiadomości + {len(official)} aktów/projektów.")
     if AI_FILTER:
-        items = ai_filter_relevance(items)  # (odlozone) z kluczem: tylko scisle podatkowe newsy
-    summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
-    summary = ai_summary(items)        # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
+        try:
+            items = ai_filter_relevance(items)  # (odlozone) z kluczem: tylko scisle podatkowe newsy
+        except Exception as e:
+            print(f"  [AI filtr POMINIĘTY] {e}")
+    try:
+        summarize_articles(items)      # streszczenia poszczególnych artykułów (jeśli jest klucz)
+    except Exception as e:
+        print(f"  [streszczenia POMINIĘTE] {e}")
+    try:
+        summary = ai_summary(items)    # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
+    except Exception as e:
+        print(f"  [podsumowanie POMINIĘTE] {e}")
+        summary = ""
 
     # Lista źródeł do kafelków — TYLKO portale RSS (źródła oficjalne mają teraz
     # własną sekcję "Ścieżka legislacyjna", więc nie dublujemy ich w chipach).
