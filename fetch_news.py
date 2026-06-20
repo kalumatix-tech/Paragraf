@@ -21,9 +21,18 @@ import urllib.parse
 import feedparser
 import requests
 
+# ------------------------------------------------------------------ #
+#  ZRODLA  —  dodawaj / usuwaj tutaj                                  #
+#  (uzywamy AKTYWNEGO wzoru ".feed" — stare adresy rss.* byly martwe) #
+# ------------------------------------------------------------------ #
 FEEDS = [
+    # ============================================================== #
+    #  ZASADA: tylko DZIALY scisle podatkowo-prawne, NIE cale gazety. #
+    #  Cale portale (rp.pl, money, wprost, BI) wpuszczaly kulture,    #
+    #  sport i film ("Plus Minus") — dlatego ich tu NIE ma.           #
+    # ============================================================== #
 
-     --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
+    # --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
     {"id": "infor-ks", "name": "INFOR Księgowość",    "cat": "Podatki", "color": "#8a2e2a",
      "url": "https://ksiegowosc.infor.pl/.feed"},
     {"id": "infor-pr", "name": "INFOR Prawo",          "cat": "Prawo",   "color": "#1b5e57",
@@ -31,22 +40,28 @@ FEEDS = [
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
 
-     --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
+    # --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
     {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
      "url": "https://interpretacje-podatkowe.org/feed"},
 
-     --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
+    # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
 
-   
-     {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"}.
-    
+    # ============================================================== #
+    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
