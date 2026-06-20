@@ -61,6 +61,31 @@ UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
 SUMMARIZE_TOP = 18
 
 # ------------------------------------------------------------------ #
+#  ZRODLA OFICJALNE (publiczne API Kancelarii Sejmu — bez klucza)     #
+#  Dziennik Ustaw + Monitor Polski (publikowane akty) oraz projekty   #
+#  ustaw (druki sejmowe). To autorytatywne, niezalezne od portali.    #
+# ------------------------------------------------------------------ #
+OFFICIAL_ENABLED = True
+SEJM_TERM = 10                 # kadencja Sejmu (zmien po nowych wyborach)
+OFFICIAL_MAX = 12             # ile najnowszych pozycji z KAZDEGO zrodla oficjalnego
+OFFICIAL_MAX_AGE_DAYS = 60    # akty prawne pokazujemy dluzej niz newsy (rzadziej wychodza)
+
+OFFICIAL_SRC = {
+    "du":   {"name": "Dziennik Ustaw",  "cat": "Legislacja", "color": "#1d3a6b"},
+    "mp":   {"name": "Monitor Polski",  "cat": "Legislacja", "color": "#0f5c4a"},
+    "sejm": {"name": "Sejm — projekty",  "cat": "Projekty",   "color": "#7a2e5c"},
+}
+
+# Z urzedowego "firehose'a" (wszystkie akty/projekty) przepuszczamy tylko te,
+# ktorych TYTUL pasuje tematycznie. Rdzenie slow (jak w BLOCK/FOCUS).
+OFFICIAL_TOPICS = [
+    "podatk", "vat", "cit", "pit", "akcyz", "ryczałt", "składk", "ubezpiecz",
+    "zus", "rachunkow", "ordynacj", "finans", "opłat", "cło", "celn", "faktur",
+    "ksef", "jpk", "danin", "skarbow", "przedsiębiorc", "działalnoś", "spółk",
+    "upadłoś", "restrukturyzacj", "wynagrodz", "emerytur", "gospodarcz", "budżet",
+]
+
+# ------------------------------------------------------------------ #
 #  ODSIEW  —  to tutaj decydujesz, co odpada                          #
 # ------------------------------------------------------------------ #
 #
@@ -181,11 +206,12 @@ def apply_filters(items):
     dropped_age = dropped_block = dropped_focus = dropped_dup = 0
 
     for it in items:
-        # --- świeżość ---
-        if MAX_AGE_DAYS and it["date"]:
+        # --- świeżość (akty prawne trzymamy dłużej niż newsy) ---
+        limit_days = OFFICIAL_MAX_AGE_DAYS if it.get("official") else MAX_AGE_DAYS
+        if limit_days and it["date"]:
             try:
                 d = datetime.datetime.fromisoformat(it["date"])
-                if (now - d).days > MAX_AGE_DAYS:
+                if (now - d).days > limit_days:
                     dropped_age += 1
                     continue
             except Exception:
@@ -308,13 +334,117 @@ def summarize_articles(items) -> None:
         if not key:
             print("  (bez streszczeń artykułów — brak sekretu ANTHROPIC_API_KEY)")
         return
-    targets = items[:SUMMARIZE_TOP]
+    targets = [it for it in items if not it.get("official")][:SUMMARIZE_TOP]
     print(f"  Streszczam {len(targets)} najnowszych artykułów…")
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda it: _summarize_one(it, key), targets))
     done = sum(1 for it in targets if it.get("summary"))
     print(f"  Streszczono: {done}/{len(targets)} artykułów.")
+
+
+# ------------------------------------------------------------------ #
+#  ZRODLA OFICJALNE — pobieranie z API Sejm/ELI                       #
+# ------------------------------------------------------------------ #
+def _date_iso(s: str):
+    s = (s or "").strip()
+    if not s:
+        return None
+    try:
+        d = datetime.datetime.fromisoformat(s)
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=datetime.timezone.utc)
+        return d.isoformat()
+    except Exception:
+        return None
+
+
+def _api_get(url: str):
+    try:
+        r = requests.get(url, headers={"User-Agent": UA, "Accept": "application/json"}, timeout=25)
+        if r.status_code != 200:
+            print(f"  [API {r.status_code}] {url}")
+            return None
+        return r.json()
+    except Exception as ex:
+        print(f"  [API błąd] {url}: {ex}")
+        return None
+
+
+def _topic_ok(title: str) -> bool:
+    hay = " " + _norm(title) + " "
+    return any(_hit(hay, w) for w in OFFICIAL_TOPICS)
+
+
+def _eli_items(pub: str):
+    """Dziennik Ustaw (DU) lub Monitor Polski (MP) — najnowsze akty na temat."""
+    year = datetime.datetime.now(datetime.timezone.utc).year
+    data = _api_get(f"https://api.sejm.gov.pl/eli/acts/{pub}/{year}")
+    if not data:
+        return []
+    raw = data.get("items", []) or []
+    raw.sort(key=lambda a: a.get("announcementDate") or a.get("changeDate") or "", reverse=True)
+    meta = OFFICIAL_SRC["du" if pub == "DU" else "mp"]
+    out = []
+    for a in raw:
+        title = (a.get("title") or "").strip()
+        if not title or not _topic_ok(title):
+            continue
+        eli = a.get("ELI", "")
+        parts = eli.split("/")
+        link = (f"https://api.sejm.gov.pl/eli/acts/{eli}/text.pdf" if len(parts) == 3
+                else f"https://api.sejm.gov.pl/eli/acts/{pub}/{year}")
+        typ = (a.get("type") or "").strip()
+        sig = (a.get("displayAddress") or "").strip()
+        desc = (typ + " · " + sig).strip(" ·")
+        out.append({
+            "title": title, "link": link, "desc": desc, "summary": "",
+            "date": _date_iso(a.get("announcementDate") or a.get("changeDate", "")[:10]),
+            "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
+            "fid": "off-" + ("du" if pub == "DU" else "mp"), "official": True,
+        })
+        if len(out) >= OFFICIAL_MAX:
+            break
+    print(f"  [{meta['name']}] dopasowano {len(out)} aktów.")
+    return out
+
+
+def _sejm_prints():
+    """Projekty ustaw i inne druki sejmowe — najnowsze na temat."""
+    data = _api_get(f"https://api.sejm.gov.pl/sejm/term{SEJM_TERM}/prints?sort_by=-documentDate&limit=80")
+    if data is None:
+        return []
+    raw = data if isinstance(data, list) else data.get("items", [])
+    raw = [p for p in raw if isinstance(p, dict)]
+    raw.sort(key=lambda p: p.get("documentDate") or p.get("changeDate") or "", reverse=True)
+    meta = OFFICIAL_SRC["sejm"]
+    out = []
+    for p in raw:
+        title = (p.get("title") or "").strip()
+        num = str(p.get("number", "")).strip()
+        if not title or not num or not _topic_ok(title):
+            continue
+        out.append({
+            "title": title,
+            "link": f"https://api.sejm.gov.pl/sejm/term{SEJM_TERM}/prints/{num}/{num}.pdf",
+            "desc": f"Druk sejmowy nr {num}", "summary": "",
+            "date": _date_iso((p.get("documentDate") or p.get("changeDate") or "")[:10]),
+            "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
+            "fid": "off-sejm", "official": True,
+        })
+        if len(out) >= OFFICIAL_MAX:
+            break
+    print(f"  [{meta['name']}] dopasowano {len(out)} projektów.")
+    return out
+
+
+def fetch_official():
+    if not OFFICIAL_ENABLED:
+        return [], 0
+    print("Pobieram źródła oficjalne (API Sejm/ELI)…")
+    items = _eli_items("DU") + _eli_items("MP") + _sejm_prints()
+    live = len({it["fid"] for it in items})
+    return items, live
 
 
 # ------------------------------------------------------------------ #
@@ -453,7 +583,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <footer>
       <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — wiadomości z portali podatkowo-prawnych w jednym miejscu, bez objeżdżania 20 stron.<br>
-      Źródła: INFOR (Księgowość, Prawo, Kadry) i Gazeta Prawna (Podatki, Prawo, Biznes). Chipem włączasz/wyłączasz źródło — wybór zapamiętuje się w przeglądarce.
+      Źródła: portale (INFOR, Bankier) oraz <b>oficjalne API</b> — Dziennik Ustaw, Monitor Polski i projekty ustaw z Sejmu. Chipem włączasz/wyłączasz źródło; wybór zapamiętuje przeglądarka.
     </footer>
   </div>
 
@@ -570,14 +700,25 @@ def render(items, feeds, summary, live):
 def main():
     print("Pobieram kanały RSS…")
     items, live = fetch_all()
-    print(f"Pobrano {len(items)} pozycji z {live}/{len(FEEDS)} źródeł. Odsiewam…")
+    oitems, olive = fetch_official()
+    items += oitems
+    items.sort(key=lambda it: it["date"] or "", reverse=True)
+    print(f"Pobrano {len(items)} pozycji z {live + olive} źródeł (w tym {olive} oficjalnych). Odsiewam…")
     items = apply_filters(items)[:MAX_ITEMS]
     print(f"Po odsiewie zostaje {len(items)} pozycji.")
     summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
     summary = ai_summary(items)        # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
+
+    # Lista źródeł do kafelków (portale RSS + źródła oficjalne)
+    chip_sources = [{"id": f["id"], "name": f["name"], "cat": f["cat"], "color": f["color"]} for f in FEEDS]
+    if OFFICIAL_ENABLED:
+        for k in ("du", "mp", "sejm"):
+            m = OFFICIAL_SRC[k]
+            chip_sources.append({"id": "off-" + k, "name": m["name"], "cat": m["cat"], "color": m["color"]})
+
     out = pathlib.Path("public")
     out.mkdir(exist_ok=True)
-    (out / "index.html").write_text(render(items, FEEDS, summary, live), encoding="utf-8")
+    (out / "index.html").write_text(render(items, chip_sources, summary, live + olive), encoding="utf-8")
     print("Zapisano public/index.html — gotowe.")
 
 
