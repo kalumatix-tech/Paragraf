@@ -21,18 +21,9 @@ import urllib.parse
 import feedparser
 import requests
 
-# ------------------------------------------------------------------ #
-#  ZRODLA  —  dodawaj / usuwaj tutaj                                  #
-#  (uzywamy AKTYWNEGO wzoru ".feed" — stare adresy rss.* byly martwe) #
-# ------------------------------------------------------------------ #
 FEEDS = [
-    # ============================================================== #
-    #  ZASADA: tylko DZIALY scisle podatkowo-prawne, NIE cale gazety. #
-    #  Cale portale (rp.pl, money, wprost, BI) wpuszczaly kulture,    #
-    #  sport i film ("Plus Minus") — dlatego ich tu NIE ma.           #
-    # ============================================================== #
 
-    # --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
+     --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
     {"id": "infor-ks", "name": "INFOR Księgowość",    "cat": "Podatki", "color": "#8a2e2a",
      "url": "https://ksiegowosc.infor.pl/.feed"},
     {"id": "infor-pr", "name": "INFOR Prawo",          "cat": "Prawo",   "color": "#1b5e57",
@@ -40,20 +31,22 @@ FEEDS = [
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
 
-    # --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
+     --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
     {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
      "url": "https://interpretacje-podatkowe.org/feed"},
 
-    # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
+     --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
-    {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-    {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-    {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-    {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-    {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-    {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
 
+   
+     {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"}.
+    
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -927,6 +920,17 @@ TEMPLATE = r'''<!DOCTYPE html>
   .rp-list li i{font-style:normal;color:var(--ink-faint);font-size:10.5px;margin-left:7px}
   .rp-link{display:inline-block;margin-top:8px;font-size:12px;color:var(--accent);text-decoration:none}
   .rp-link:hover{text-decoration:underline}
+  /* plusik „dodaj do Moje" + plakietka */
+  .addbtn{flex:none;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-faint);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;
+    justify-content:center;padding:0;transition:.15s}
+  .addbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .addbtn.added{background:var(--accent);border-color:var(--accent);color:#f3e9df}
+  .lright{display:flex;align-items:center;gap:9px}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:2px}
+  .tabbadge{display:none;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);
+    color:#f3e9df;font-size:10px;font-weight:700;line-height:17px;text-align:center;margin-left:6px;vertical-align:middle}
+  .tabbadge.show{display:inline-block}
 
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -958,6 +962,8 @@ TEMPLATE = r'''<!DOCTYPE html>
     <nav class="tabs">
       <button class="tab on" data-tab="news">Wiadomości</button>
       <button class="tab" data-tab="legis">Ustawy</button>
+      <button class="tab" data-tab="rcl">RCL</button>
+      <button class="tab" data-tab="moje">Moje<span class="tabbadge" id="mojeBadge"></span></button>
     </nav>
 
     <section id="newsView">
@@ -974,19 +980,35 @@ TEMPLATE = r'''<!DOCTYPE html>
     <section id="legisView" hidden>
       <div class="controls">
         <div class="searchrow">
-          <input class="search" id="searchL" type="text" placeholder="Szukaj ustawy / projektu / nr druku…  (Enter = na żywo)" autocomplete="off">
-          <button class="livebtn" id="liveBtn" title="Pobierz na żywo z Dziennika Ustaw i RCL">Szukaj na żywo</button>
+          <input class="search" id="searchL" type="text" placeholder="Szukaj ustawy w Dz.U. / nr druku Sejmu…  (Enter = na żywo)" autocomplete="off">
+          <button class="livebtn" id="liveBtn" title="Pobierz na żywo z Dziennika Ustaw">Szukaj na żywo</button>
         </div>
-        <p class="livehint">Pisanie filtruje na bieżąco to, co już pobrane. <b>„Szukaj na żywo"</b> (albo Enter) odpytuje Dziennik Ustaw i RCL w czasie rzeczywistym — znajdzie też starsze rzeczy, jak UD116.</p>
+        <p class="livehint">Pisanie filtruje na bieżąco to, co już pobrane. <b>„Szukaj na żywo"</b> (albo Enter) odpytuje Dziennik Ustaw i Monitor Polski w czasie rzeczywistym.</p>
       </div>
-
       <div id="liveResults"></div>
       <section id="legis"></section>
     </section>
 
+    <section id="rclView" hidden>
+      <div class="controls">
+        <div class="searchrow">
+          <input class="search" id="searchR" type="text" placeholder="Projekt rządowy: ryczałt, VAT, akcyza, UD116…  (Enter)" autocomplete="off">
+          <button class="livebtn" id="rclBtn" title="Pobierz projekty na żywo z RCL">Szukaj</button>
+        </div>
+        <p class="livehint">Rządowy proces legislacyjny — projekty, <b>zanim trafią do Sejmu</b>. Szukam na żywo w RCL; przy szukaniu po słowie pokazuję tylko projekty <b>w toku</b> (zakończone i przekazane do Sejmu pomijam).</p>
+      </div>
+      <div id="rclResults"></div>
+      <section id="rclList"></section>
+    </section>
+
+    <section id="mojeView" hidden>
+      <p class="livehint" style="margin:2px 2px 18px">Twoja kolekcja. Dodawaj plusikiem <b>+</b> z dowolnej zakładki (Wiadomości, Ustawy, RCL). Zapisuje się w tej przeglądarce.</p>
+      <section id="mojeList"></section>
+    </section>
+
     <footer>
       <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — w jednym miejscu.<br>
-      Zakładka <b>Ustawy</b> pokazuje ścieżkę legislacyjną (Projekt → Sejm → Prezydent → Dz.U.) wprost z oficjalnego API Sejmu i pozwala przeszukać akty. Zakładka <b>Wiadomości</b> — artykuły z portali (chipem włączasz/wyłączasz źródło; wybór zapamiętuje przeglądarka).
+      <b>Wiadomości</b> — artykuły z portali (chipem włączasz/wyłączasz źródło). <b>Ustawy</b> — projekty w Sejmie i ustawy ogłoszone w Dz.U. <b>RCL</b> — projekty na etapie rządowym, z rozwijanymi etapami. <b>Moje</b> — pozycje dodane plusikiem. Wybory zapamiętuje przeglądarka.
     </footer>
   </div>
 
@@ -994,12 +1016,25 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", tab:"news" };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[] };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
+try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
 const presentIds = new Set(DATA.map(d=>d.fid));
 
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+// --- „Moje": zapisywane w przeglądarce ---
+function saveMoje(){ try{localStorage.setItem("paragraf-moje",JSON.stringify(state.moje))}catch(e){} }
+function mojeHas(link){ return state.moje.some(x=>x.link===link); }
+function toggleMoje(it){
+  if(mojeHas(it.link)) state.moje=state.moje.filter(x=>x.link!==it.link);
+  else state.moje=[{...it,_added:Date.now()}, ...state.moje];
+  saveMoje(); render();
+}
+function addbtn(it){
+  const on=mojeHas(it.link);
+  return `<button class="addbtn${on?' added':''}" data-item="${esc(JSON.stringify(it))}" title="${on?'Usuń z „Moje”':'Dodaj do „Moje”'}">${on?'✓':'+'}</button>`;
+}
 const PL = new Intl.DateTimeFormat("pl-PL",{day:"numeric",month:"long",year:"numeric"});
 const NOW_Y = new Date().getFullYear();
 // Twarda walidacja daty: odrzuca bledne/przyszle roczniki (np. "2206").
@@ -1034,11 +1069,18 @@ function newsVisible(){
     .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat).toLowerCase().includes(q))
     .map(it=>({...it,_d:pd(it.date)}));
 }
-function legisVisible(){
+function ustawyVisible(){
   const q=state.qL.trim().toLowerCase();
   return DATA
-    .filter(it=>it.track)
+    .filter(it=>it.track && (it.src||"").indexOf("RCL")<0)
     .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat+" "+(it.stage||"")).toLowerCase().includes(q))
+    .map(it=>({...it,_d:pd(it.date)}));
+}
+function rclVisible(){
+  const q=state.qR.trim().toLowerCase();
+  return DATA
+    .filter(it=>it.track && (it.src||"").indexOf("RCL")>=0)
+    .filter(it=>!q||(it.title+" "+it.desc+" "+(it.stage||"")).toLowerCase().includes(q))
     .map(it=>({...it,_d:pd(it.date)}));
 }
 
@@ -1093,6 +1135,8 @@ function legisCard(it){
   const when = ago(it._d) || "—";
   const stageLine = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
   const isRclGov = (it.src||"").indexOf("RCL")>=0 && !it.left && !it.closed;
+  const type = it.type || ((it.src||"").indexOf("RCL")>=0 ? "rcl" : "ustawa");
+  const mini = {type, title:it.title, link:it.link, src:it.src, stage:it.stage||"", step:it.step||1};
   let body;
   if(it.stages && it.stages.length){
     const cur = it.stages.find(s=>s.state==="cur") || it.stages[it.stages.length-1];
@@ -1110,7 +1154,7 @@ function legisCard(it){
     body = stepper(it.step||1) + stageLine;
   }
   return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''}" style="--ccol:${it.color}">
-    <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lwhen">${esc(when)}</span></div>
+    <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lright"><span class="lwhen">${esc(when)}</span>${addbtn(mini)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
     ${body}
   </article>`;
@@ -1121,73 +1165,106 @@ const LEGIS_DEFAULT = 18;
 // ---- WYSZUKIWANIE NA ŻYWO (Dz.U. + RCL) ----
 // Statyczna strona nie ma serwera, więc próbujemy bezpośrednio, a gdy
 // przeglądarka zablokuje (CORS) — przez darmowy przekaźnik. Dane publiczne.
-const PROXIES = [
+const PXY = [
   u => u,
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
   u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
   u => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u),
 ];
+const _cache = new Map();
+// Ścigamy wszystkie przekaźniki naraz — bierzemy pierwszy, który odpowie poprawnie.
+function _race(urls, asText){
+  return new Promise(resolve=>{
+    let left=urls.length, done=false;
+    if(!left){ resolve(null); return; }
+    urls.forEach(u=>{
+      fetch(u).then(r=>{ if(!r.ok) throw 0; return asText?r.text():r.json(); })
+        .then(v=>{ if(done) return; if(asText && (!v||v.length<50)) throw 0; done=true; resolve(v); })
+        .catch(()=>{ if(--left===0 && !done){ done=true; resolve(null); } });
+    });
+  });
+}
 async function getJSON(u){
-  for(const p of PROXIES){ try{ const r=await fetch(p(u)); if(r.ok) return await r.json(); }catch(e){} }
-  return null;
+  if(_cache.has("j"+u)) return _cache.get("j"+u);
+  const v = await _race(PXY.map(p=>p(u)), false);
+  _cache.set("j"+u, v); return v;
 }
 async function getText(u){
-  for(const p of [PROXIES[1],PROXIES[2],PROXIES[3],PROXIES[0]]){ try{ const r=await fetch(p(u)); if(r.ok){ const t=await r.text(); if(t && t.length>50) return t; } }catch(e){} }
-  return null;
+  if(_cache.has("t"+u)) return _cache.get("t"+u);
+  const v = await _race([PXY[1],PXY[2],PXY[3],PXY[0]].map(p=>p(u)), true);
+  _cache.set("t"+u, v); return v;
 }
-async function liveSearch(){
-  const q=((state.qL!==undefined?state.qL:"")||$("#searchL").value||"").trim();
+// Dz.U./M.P. — wyszukiwanie w zakładce „Ustawy"
+async function searchDU(){
+  const q=(state.qL||$("#searchL").value||"").trim();
   const box=$("#liveResults"), btn=$("#liveBtn");
-  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki, potem „Szukaj na żywo".</div>`; return; }
-  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam na żywo w Dzienniku Ustaw i RCL…</div>`;
+  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
+  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam w Dzienniku Ustaw…</div>`;
   const out=[];
   try{
-    for(const pub of ["DU","MP"]){
-      const data=await getJSON(`https://api.sejm.gov.pl/eli/acts/search?title=${encodeURIComponent(q)}&publisher=${pub}&limit=15`);
+    const reqs=["DU","MP"].map(pub=>
+      getJSON(`https://api.sejm.gov.pl/eli/acts/search?title=${encodeURIComponent(q)}&publisher=${pub}&limit=15`)
+        .then(data=>({pub,data})));
+    for(const {pub,data} of await Promise.all(reqs)){
       if(data && Array.isArray(data.items)){
         for(const a of data.items.slice(0,15)){
           if(!a||!a.title) continue;
-          out.push({title:a.title, link:a.ELI?`https://api.sejm.gov.pl/eli/acts/${a.ELI}/text.pdf`:"#",
+          out.push({type:"ustawa", title:a.title, link:a.ELI?`https://api.sejm.gov.pl/eli/acts/${a.ELI}/text.pdf`:"#",
             src:pub==="DU"?"Dziennik Ustaw":"Monitor Polski", color:pub==="DU"?"#1d3a6b":"#0f5c4a",
             stage:"Opublikowano", step:4, _d:pd(a.announcementDate||null)});
         }
       }
     }
-    // RCL — etap rządowy. Numer z wykazu (UD116/UC55) -> number=, inaczej title=.
-    const numLike = /^[A-Za-z]{2}\s?\d{1,4}$/.test(q);
-    const rclQ = numLike ? "number=" + encodeURIComponent(q.replace(/\s+/g,"").toUpperCase())
-                         : "title=" + encodeURIComponent(q);
+  }catch(e){}
+  btn.disabled=false;
+  if(!out.length){ box.innerHTML=`<div class="live-status">Nic nie znalazłem w Dz.U./M.P. dla „${esc(q)}".</div>`; return; }
+  box.innerHTML=`<div class="live-sec-head">Dziennik Ustaw / Monitor Polski — „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
+}
+
+// RCL — wyszukiwanie projektów rządowych w zakładce „RCL"
+async function searchRCL(){
+  const q=(state.qR||$("#searchR").value||"").trim();
+  const box=$("#rclResults"), btn=$("#rclBtn");
+  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
+  const numLike=/^[A-Za-z]{2}\s?\d{1,4}$/.test(q);
+  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam projektów w RCL…</div>`;
+  const out=[];
+  try{
+    const rclQ=numLike ? "number="+encodeURIComponent(q.replace(/\s+/g,"").toUpperCase())
+                       : "title="+encodeURIComponent(q);
     const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&${rclQ}`);
+    const cand=[];
     if(htmlTxt){
-      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set(); const cand=[];
+      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set();
       while((m=re.exec(htmlTxt))){
         if(seen.has(m[1])) continue; seen.add(m[1]);
         const t=m[2].replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
         if(t.length<6) continue;
         cand.push({title:t, link:"https://legislacja.rcl.gov.pl"+m[1]});
-        if(cand.length>=8) break;
-      }
-      // Etap odczytujemy ze STRONY projektu (lista go nie pokazuje).
-      for(const c of cand){
-        const page = await getText(c.link);
-        const st = rclStatus(page);
-        const base={title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
-        if(st==="left")        out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
-        else if(st==="closed") out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
-        else if(st==="in_gov") out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
-        else                   out.push({...base, stage:"Etap rządowy — sprawdź szczegóły w RCL"});
+        if(cand.length>=12) break;
       }
     }
+    // strony projektów pobieramy RÓWNOLEGLE (szybko)
+    const pages=await Promise.all(cand.map(c=>getText(c.link)));
+    cand.forEach((c,i)=>{
+      const page=pages[i]; const st=rclStatus(page);
+      const base={type:"rcl", title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
+      if(st==="in_gov")            out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
+      else if(st==="left"  && numLike) out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
+      else if(st==="closed"&& numLike) out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
+      else if(!st)                 out.push({...base, stage:"Etap rządowy — sprawdź w RCL"});
+      // przy szukaniu PO SŁOWIE: zakończone/przekazane do Sejmu pomijamy (nieważne)
+    });
   }catch(e){}
   btn.disabled=false;
   if(!out.length){
-    const numHint = /^[A-Za-z]{2}\s?\d{1,4}$/.test(q)
-      ? ` „${esc(q)}" wygląda na numer projektu rządowego (RCL). RCL nie ma publicznego API i bywa kapryśny przez przekaźnik — kliknij jeszcze raz, a jeśli dalej cisza, projekt może być już w Sejmie (wtedy szukaj po tytule lub nr druku).`
-      : "";
-    box.innerHTML=`<div class="live-status">Nic nie znalazłem na żywo dla „${esc(q)}".${numHint || " Spróbuj innego słowa lub numeru. Jeśli to się powtarza — przekaźnik danych mógł chwilowo nie odpowiedzieć, kliknij jeszcze raz."}</div>`;
+    const hint=numLike
+      ? ` Jeśli to numer (np. UD116) — sprawdź pisownię. Pusto się powtarza? Przekaźnik mógł nie odpowiedzieć, kliknij raz jeszcze.`
+      : ` Pokazuję tylko projekty w toku — możliwe, że o tej frazie nie ma teraz aktywnego projektu w rządzie (albo RCL nie złapał odmiany słowa).`;
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem w RCL dla „${esc(q)}".${hint}</div>`;
     return;
   }
-  box.innerHTML=`<div class="live-sec-head">Wyniki na żywo dla „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
+  box.innerHTML=`<div class="live-sec-head">Projekty rządowe (RCL) — „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
 }
 
 function renderNews(){
@@ -1201,7 +1278,7 @@ function renderNews(){
     const k=dayKey(it._d);
     if(k!==last){h+=`<div class="daysep"><span class="lab">${esc(dayLabel(it._d))}</span><span class="rule"></span></div>`;last=k;}
     h+=`<article class="card" style="--ccol:${it.color}">
-      <span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span></span>
+      <div class="chead"><span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span></span>${addbtn({type:"news", title:it.title, link:it.link, src:it.src, stage:"", step:0})}</div>
       <a class="title" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
       ${ (it.summary||it.desc) ? `<p class="desc${it.summary?' sum':''}">${it.summary?'<span class="aitag">✦ streszczenie</span> ':''}${esc(it.summary||it.desc)}</p>` : "" }
       <div class="meta">${esc(ago(it._d))||"—"}</div>
@@ -1210,36 +1287,67 @@ function renderNews(){
   feed.innerHTML=h; return vis.length;
 }
 
-function renderLegis(){
-  const all=legisVisible(); const L=$("#legis");
-  const searching = state.qL.trim().length>0;
-  if(!all.length){
-    L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak ustaw</h3><p>${searching?'Nic nie pasuje do tej frazy.':'Brak świeżych aktów i projektów.'}</p></div>`;
+function renderTracker(items, L, searching, headOn, countWord){
+  if(!L) return 0;
+  if(!items.length){
+    L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak pozycji</h3><p>${searching?'Nic nie pasuje do tej frazy.':'Brak świeżych pozycji.'}</p></div>`;
     return 0;
   }
-  const show = searching ? all : all.slice(0, LEGIS_DEFAULT);
-  let h=`<div class="lsec-head"><span class="lt">${searching?'Wyniki wyszukiwania':'Ścieżka legislacyjna'}</span>`
-    +`<span class="lcount">${searching?(all.length+' znalezionych'):(all.length+' śledzonych')}</span></div>`
+  const show = searching ? items : items.slice(0, LEGIS_DEFAULT);
+  let h=`<div class="lsec-head"><span class="lt">${searching?'Wyniki wyszukiwania':headOn}</span>`
+    +`<span class="lcount">${searching?(items.length+' znalezionych'):(items.length+' '+countWord)}</span></div>`
     +`<div class="lgrid">${show.map(legisCard).join("")}</div>`;
-  if(!searching && all.length>LEGIS_DEFAULT){
-    h+=`<button class="showall" id="showAll">Pokaż wszystkie (${all.length})</button>`;
+  if(!searching && items.length>LEGIS_DEFAULT){
+    h+=`<button class="showall">Pokaż wszystkie (${items.length})</button>`;
   }
   L.innerHTML=h;
-  const sa=$("#showAll");
-  if(sa) sa.onclick=()=>{ L.querySelector(".lgrid").innerHTML=all.map(legisCard).join(""); sa.remove(); };
-  return all.length;
+  const sa=L.querySelector(".showall");
+  if(sa) sa.onclick=()=>{ L.querySelector(".lgrid").innerHTML=items.map(legisCard).join(""); sa.remove(); };
+  return items.length;
+}
+function renderUstawy(){ return renderTracker(ustawyVisible(), $("#legis"), state.qL.trim().length>0, "Sejm i Dziennik Ustaw", "śledzonych"); }
+function renderRcl(){ return renderTracker(rclVisible(), $("#rclList"), state.qR.trim().length>0, "Projekty na etapie rządowym", "projektów"); }
+
+function mojeCard(it){
+  const label = it.type==="news" ? "Wiadomość" : (it.type==="rcl" ? "RCL" : "Ustawa");
+  const col   = it.type==="news" ? "#7a5a2e" : (it.type==="rcl" ? "#8a2e2a" : "#1d3a6b");
+  const st = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
+  return `<article class="lcard" style="--ccol:${col}">
+    <div class="lhead"><span class="lsrc"><span class="dot"></span><b>${esc(label)}</b>${it.src?" · "+esc(it.src):""}</span>
+      <button class="addbtn added" data-rm="${esc(it.link)}" title="Usuń z „Moje”">✓</button></div>
+    <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+    ${st}
+  </article>`;
+}
+function renderMoje(){
+  const L=$("#mojeList"); if(!L) return 0;
+  if(!state.moje.length){
+    L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Pusto w „Moje"</h3><p>Dodawaj pozycje plusikiem + z innych zakładek.</p></div>`;
+    return 0;
+  }
+  L.innerHTML=`<div class="lsec-head"><span class="lt">Twoja kolekcja</span><span class="lcount">${state.moje.length} zapisanych</span></div>`
+    +`<div class="lgrid">${state.moje.map(mojeCard).join("")}</div>`;
+  return state.moje.length;
 }
 
+function updateMojeBadge(n){
+  const b=$("#mojeBadge"); if(!b) return;
+  b.textContent=n||""; b.classList.toggle("show",(n||0)>0);
+}
 function render(){
-  const nc=renderNews(); const lc=renderLegis();
-  $("#stCount").textContent = (state.tab==="legis") ? lc : nc;
+  const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
+  updateMojeBadge(mj);
+  const c = state.tab==="legis"?u : state.tab==="rcl"?r : state.tab==="moje"?mj : n;
+  $("#stCount").textContent = c;
 }
 
 function switchTab(t){
   state.tab=t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
-  $("#newsView").hidden = (t!=="news");
-  $("#legisView").hidden = (t!=="legis");
+  $("#newsView").hidden  = t!=="news";
+  $("#legisView").hidden = t!=="legis";
+  $("#rclView").hidden   = t!=="rcl";
+  $("#mojeView").hidden  = t!=="moje";
   render();
 }
 
@@ -1248,9 +1356,19 @@ function switchTab(t){
   if(b){ $("#stTime").textContent=b.toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"}); $("#stDate").textContent=PL.format(b); }
   let t1;$("#search").oninput=e=>{state.q=e.target.value;clearTimeout(t1);t1=setTimeout(render,160)};
   let t2;$("#searchL").oninput=e=>{state.qL=e.target.value;clearTimeout(t2);t2=setTimeout(render,160)};
-  $("#liveBtn").onclick=liveSearch;
-  $("#searchL").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); liveSearch(); } });
+  let t3;$("#searchR").oninput=e=>{state.qR=e.target.value;clearTimeout(t3);t3=setTimeout(render,160)};
+  $("#liveBtn").onclick=searchDU;
+  $("#searchL").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchDU(); } });
+  $("#rclBtn").onclick=searchRCL;
+  $("#searchR").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchRCL(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  // delegacja: „+" dodaj / „✓" usuń (na kartach) oraz usuń w „Moje"
+  document.body.addEventListener("click", e=>{
+    const add=e.target.closest(".addbtn[data-item]");
+    if(add){ try{ toggleMoje(JSON.parse(add.dataset.item)); }catch(_){} return; }
+    const rm=e.target.closest("[data-rm]");
+    if(rm){ state.moje=state.moje.filter(x=>x.link!==rm.dataset.rm); saveMoje(); render(); }
+  });
   renderChips(); render();
 })();
 </script>
