@@ -1,0 +1,11 @@
+# Moje obserwowane projekty — jeden wpis na linię.
+#
+# Możesz wpisać:
+#   • numer z wykazu RCL, np.:        UD116
+#   • albo pełny link do projektu, np.:  https://legislacja.rcl.gov.pl/projekt/12402157
+#
+# Linie zaczynające się od # są pomijane (to komentarze).
+# Po każdej zmianie tego pliku robot przy najbliższym sprawdzeniu (co 24h)
+# uwzględni nową listę. Możesz też uruchomić sprawdzenie ręcznie w zakładce Actions.
+
+UD116
