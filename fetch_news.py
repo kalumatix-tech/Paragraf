@@ -33,16 +33,32 @@ FEEDS = [
      "url": "https://kadry.infor.pl/.feed"},
     {"id": "infor-mf", "name": "INFOR Moja firma",     "cat": "Biznes",  "color": "#2e6e8c",
      "url": "https://mojafirma.infor.pl/.feed"},
-    # Dodatkowe gotowe kanaly Infor — odkomentuj, jesli chcesz wiecej:
-    # {"id": "infor-bud", "name": "INFOR Księgowość budżetowa", "cat": "Budżet", "color": "#9a6b2e",
+    {"id": "bankier",  "name": "Bankier.pl",           "cat": "Finanse", "color": "#9a6b2e",
+     "url": "https://www.bankier.pl/rss/finanse.xml"},
+
+    # ---------------------------------------------------------------- #
+    #  MENU DODATKOWYCH ZRODEL — odkomentuj (usun #) te, ktorych chcesz.
+    #  Po uruchomieniu sprawdz w logu Actions liczbe pobranych z danego
+    #  zrodla. Jesli pokaze "[pusto]" albo same smieci — usun je z powrotem.
+    #  (Czesc polskich kanalow bywa martwa lub szeroka — log to zweryfikuje.)
+    # ---------------------------------------------------------------- #
+    # {"id": "infor-bud", "name": "INFOR Księgowość budżetowa", "cat": "Budżet", "color": "#5b4b8a",
     #  "url": "https://ksiegowosc-budzetowa.infor.pl/.feed"},
-    # {"id": "infor-sam", "name": "INFOR Samorząd",     "cat": "Samorząd", "color": "#5b4b8a",
+    # {"id": "infor-sam", "name": "INFOR Samorząd",     "cat": "Samorząd", "color": "#6b6b2a",
     #  "url": "https://samorzad.infor.pl/.feed"},
+    # {"id": "money",    "name": "money.pl",            "cat": "Biznes",  "color": "#2e6e8c",
+    #  "url": "https://www.money.pl/rss/"},
+    # {"id": "bankier-w","name": "Bankier wiadomości",  "cat": "Biznes",  "color": "#9a6b2e",
+    #  "url": "https://www.bankier.pl/rss/wiadomosci.xml"},
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
-PER_FEED = 20                   # ile najnowszych z jednego zrodla pobieramy do obrobki
+PER_FEED = 60                   # ile najnowszych z jednego zrodla pobieramy do obrobki
 UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
+
+# ILE najnowszych artykulow ma dostac streszczenie AI (2 zdania w karcie).
+# Dziala TYLKO, gdy ustawiony jest sekret ANTHROPIC_API_KEY. 0 = wylacz.
+SUMMARIZE_TOP = 18
 
 # ------------------------------------------------------------------ #
 #  ODSIEW  —  to tutaj decydujesz, co odpada                          #
@@ -73,10 +89,7 @@ BLOCK = [
 #    zawierajace ktorys z tych rdzeni. To najostrzejszy filtr — wlacz,
 #    gdy chcesz wylacznie tematy podatkowo-prawne. Moze uciac trafne
 #    wpisy bez tych slow. Domyslnie pusta (= bialej listy nie ma).
-FOCUS = ["vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg","ordynacj", "ustaw", 
-         "nowelizacj", "interpretacj", "orzeczeni","wyrok", "nsa", "tsue", "fiskus", "skarbow", 
-         "akcyz", "ryczałt", "faktur", "jpk", "doręczeni", "deklaracj", "rozliczeni", "danin","opłat", 
-         "ministerstwo finansów", "estoński", "dziennik ustaw"]
+FOCUS = []
 # Gotowa biala lista — skopiuj do FOCUS = [...], jesli chcesz ja wlaczyc:
 # FOCUS = ["vat", "cit", "pit", "ksef", "zus", "podatk", "składk", "ulg",
 #          "ordynacj", "ustaw", "nowelizacj", "interpretacj", "orzeczeni",
@@ -145,6 +158,7 @@ def fetch_all():
                     "title": title,
                     "link": link,
                     "desc": desc[:300],
+                    "summary": "",
                     "date": to_iso(e),
                     "src": f["name"],
                     "cat": f["cat"],
@@ -248,6 +262,62 @@ def ai_summary(items):
 
 
 # ------------------------------------------------------------------ #
+#  STRESZCZENIA POSZCZEGOLNYCH ARTYKULOW (2 zdania w karcie)          #
+#  Dziala tylko z ANTHROPIC_API_KEY. Pobiera tresc artykulu i prosi   #
+#  Claude (Haiku) o krotkie, rzeczowe streszczenie.                   #
+# ------------------------------------------------------------------ #
+def _article_text(url: str) -> str:
+    """Pobiera artykuł i wyciąga główną treść (bez nawigacji i reklam)."""
+    try:
+        import trafilatura
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=15)
+        text = trafilatura.extract(r.text, include_comments=False, include_tables=False)
+        return (text or "").strip()
+    except Exception:
+        return ""
+
+
+def _summarize_one(it: dict, key: str) -> None:
+    src = _article_text(it["link"]) or it["desc"]
+    if not src:
+        return
+    prompt = (
+        "Streść poniższy artykuł w DOKŁADNIE dwóch krótkich zdaniach po polsku — rzeczowo "
+        "i konkretnie, bez clickbaitu i bez ogólnego wstępu. Podaj najważniejszy fakt: "
+        "co się zmienia albo co warto wiedzieć.\n\nArtykuł:\n" + src[:2200]
+    )
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 220,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=40,
+        )
+        data = r.json()
+        parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
+        it["summary"] = "\n".join(parts).strip().replace("\n", " ")
+    except Exception as ex:
+        print(f"    [streszczenie błąd] {ex}")
+
+
+def summarize_articles(items) -> None:
+    """Uzupełnia pole 'summary' dla najnowszych SUMMARIZE_TOP artykułów."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key or SUMMARIZE_TOP <= 0:
+        if not key:
+            print("  (bez streszczeń artykułów — brak sekretu ANTHROPIC_API_KEY)")
+        return
+    targets = items[:SUMMARIZE_TOP]
+    print(f"  Streszczam {len(targets)} najnowszych artykułów…")
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(lambda it: _summarize_one(it, key), targets))
+    done = sum(1 for it in targets if it.get("summary"))
+    print(f"  Streszczono: {done}/{len(targets)} artykułów.")
+
+
+# ------------------------------------------------------------------ #
 #  SZABLON STRONY                                                     #
 # ------------------------------------------------------------------ #
 TEMPLATE = r'''<!DOCTYPE html>
@@ -333,6 +403,9 @@ TEMPLATE = r'''<!DOCTYPE html>
   .card .title{font-family:var(--serif);font-size:18.5px;font-weight:600;line-height:1.32;letter-spacing:-.005em;text-decoration:none;display:block}
   .card a.title:hover{text-decoration:underline;text-decoration-color:var(--ccol);text-underline-offset:3px}
   .card .desc{margin-top:6px;color:var(--ink-soft);font-size:14px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .desc.sum{-webkit-line-clamp:4;color:var(--ink)}
+  .aitag{font-size:9.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;
+    border:1px solid var(--accent);border-radius:5px;padding:1px 5px;margin-right:6px;vertical-align:1px}
   .card .meta{margin-top:10px;font-size:12px;color:var(--ink-faint);font-weight:500}
 
   .empty{text-align:center;padding:60px 20px;color:var(--ink-soft)}
@@ -445,7 +518,7 @@ function render(){
     h+=`<article class="card" style="--ccol:${it.color}">
       <span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span></span>
       <a class="title" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-      ${it.desc?`<p class="desc">${esc(it.desc)}</p>`:""}
+      ${ (it.summary||it.desc) ? `<p class="desc${it.summary?' sum':''}">${it.summary?'<span class="aitag">✦ streszczenie</span> ':''}${esc(it.summary||it.desc)}</p>` : "" }
       <div class="meta">${esc(ago(it._d))||"—"}</div>
     </article>`;
   }
@@ -500,7 +573,8 @@ def main():
     print(f"Pobrano {len(items)} pozycji z {live}/{len(FEEDS)} źródeł. Odsiewam…")
     items = apply_filters(items)[:MAX_ITEMS]
     print(f"Po odsiewie zostaje {len(items)} pozycji.")
-    summary = ai_summary(items)
+    summarize_articles(items)          # streszczenia poszczególnych artykułów (jeśli jest klucz)
+    summary = ai_summary(items)        # zbiorcze "Najważniejsze dziś" (jeśli jest klucz)
     out = pathlib.Path("public")
     out.mkdir(exist_ok=True)
     (out / "index.html").write_text(render(items, FEEDS, summary, live), encoding="utf-8")
