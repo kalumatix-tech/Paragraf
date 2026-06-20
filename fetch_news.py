@@ -442,6 +442,33 @@ def _rcl_parse_into(html_text, out, seen):
             return
 
 
+def _rcl_status(page_text):
+    """Rozpoznaje status projektu z jego STRONY (nie z listy):
+    'left'  – opuścił rząd (dalszy ciąg w Sejmie/Dz.U.),
+    'closed'– zamknięty (wycofany/niezakończony w rządzie),
+    'in_gov'– wciąż w rządzie,
+    None    – nie udało się pobrać strony."""
+    if not page_text:
+        return None
+    low = page_text.lower()
+    if "na stronach sejmu" in low or "dalszy ciąg procesu legislacyjnego" in low:
+        return "left"
+    if re.search(r"status projektu:\s*zamkn", low):
+        return "closed"
+    return "in_gov"
+
+
+def _rcl_keep_in_gov(items, limit=12):
+    """Tracker 'w rządzie' pokazuje TYLKO projekty realnie w rządzie.
+    Sprawdzamy stronę każdego (do `limit`); te, które poszły dalej, odpadają."""
+    kept = []
+    for it in items[:limit]:
+        st = _rcl_status(_http_get_text(it["link"], timeout=12))
+        if st in (None, "in_gov"):     # None = brak pobrania -> zostaw (świeże z listy)
+            kept.append(it)
+    return kept
+
+
 def _rcl_projects():
     """ETAP RZĄDOWY: projekty ustaw z wykazu RCL (legislacja.rcl.gov.pl),
     zanim trafią do Sejmu. Brak API — parsujemy listę regexem (defensywnie).
@@ -461,7 +488,8 @@ def _rcl_projects():
             break
         url = base if page == 1 else f"{base}&pNumber={page}"
         _rcl_parse_into(_http_get_text(url, timeout=20), out, seen)
-    print(f"  [Rząd (RCL)] dopasowano {len(out)} projektów rządowych.")
+    out = _rcl_keep_in_gov(out, limit=12)
+    print(f"  [Rząd (RCL)] dopasowano {len(out)} projektów rządowych (po weryfikacji statusu).")
     return out
 
 
@@ -841,6 +869,10 @@ TEMPLATE = r'''<!DOCTYPE html>
   .lstage{margin-top:9px;font-size:12px;color:var(--ink-soft);line-height:1.35}
   .lstage span{display:inline-block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;
     color:var(--ink-faint);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-right:6px}
+  .lnote{margin-top:7px;font-size:11.5px;color:#1d3a6b;background:rgba(29,58,107,.06);
+    border-radius:6px;padding:6px 9px;line-height:1.4}
+  .lcard.is-closed{opacity:.62}
+  .lcard.is-left{border-left-color:#1d3a6b}
 
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -970,21 +1002,31 @@ function renderChips(){
 }
 
 const STEPS = ["Rząd","Sejm","Prezydent","Dz.U."];
-function stepper(step){
+function stepper(step, done){
   return `<div class="stepper">`+STEPS.map((s,i)=>{
     const on = (i < step) ? "on" : "";
-    const cur = (i === step-1) ? "cur" : "";
+    const cur = (!done && i === step-1) ? "cur" : "";
     return `<div class="step ${on} ${cur}"><i></i><b>${s}</b></div>`;
   }).join("")+`</div>`;
+}
+function rclStatus(t){
+  if(!t) return null;
+  const low=t.toLowerCase();
+  if(low.includes("na stronach sejmu")||low.includes("dalszy ciąg procesu legislacyjnego")) return "left";
+  if(/status projektu:\s*zamkn/.test(low)) return "closed";
+  return "in_gov";
 }
 function legisCard(it){
   const when = ago(it._d) || "—";
   const stage = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
-  return `<article class="lcard" style="--ccol:${it.color}">
+  const stp = it.left ? stepper(1, true) : stepper(it.step||1);
+  const note = it.left ? `<div class="lnote">→ projekt opuścił etap rządowy; dalszy ciąg w Sejmie / Dz.U. (sprawdź na stronie projektu)</div>` : "";
+  return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''}" style="--ccol:${it.color}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lwhen">${esc(when)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-    ${stepper(it.step||1)}
+    ${stp}
     ${stage}
+    ${note}
   </article>`;
 }
 
@@ -1031,14 +1073,22 @@ async function liveSearch(){
                          : "title=" + encodeURIComponent(q);
     const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&${rclQ}`);
     if(htmlTxt){
-      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set();
+      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set(); const cand=[];
       while((m=re.exec(htmlTxt))){
         if(seen.has(m[1])) continue; seen.add(m[1]);
         const t=m[2].replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
         if(t.length<6) continue;
-        out.push({title:t, link:"https://legislacja.rcl.gov.pl"+m[1],
-          src:"Rząd (RCL)", color:"#8a5a2e", stage:"Prace w rządzie", step:1, _d:null});
-        if(seen.size>=25) break;
+        cand.push({title:t, link:"https://legislacja.rcl.gov.pl"+m[1]});
+        if(cand.length>=8) break;
+      }
+      // Etap odczytujemy ze STRONY projektu (lista go nie pokazuje).
+      for(const c of cand){
+        const st = rclStatus(await getText(c.link));
+        const base={title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
+        if(st==="left")        out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
+        else if(st==="closed") out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
+        else if(st==="in_gov") out.push({...base, stage:"Prace w rządzie"});
+        else                   out.push({...base, stage:"Etap rządowy — sprawdź szczegóły w RCL"});
       }
     }
   }catch(e){}
