@@ -1,0 +1,52 @@
+name: Obserwowane projekty (powiadomienia mailowe)
+
+on:
+  schedule:
+    - cron: "17 6 * * *"      # codziennie ok. 6:17 UTC (~8:17 w PL latem)
+  workflow_dispatch: {}        # pozwala uruchomić ręcznie z zakładki Actions
+
+permissions:
+  contents: write              # robot zapisuje stan obserwowanych z powrotem do repo
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    env:
+      HAS_MAIL: ${{ secrets.MAIL_USERNAME != '' }}
+    steps:
+      - name: Pobierz repo
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Zależności
+        run: pip install requests
+
+      - name: Sprawdź obserwowane projekty
+        id: watch
+        run: python watch.py
+
+      - name: Wyślij e-mail (gdy są zmiany i ustawiono pocztę)
+        if: ${{ steps.watch.outputs.changes == 'true' && env.HAS_MAIL == 'true' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER || 'smtp.gmail.com' }}
+          server_port: ${{ secrets.MAIL_PORT || '465' }}
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: ${{ steps.watch.outputs.subject }}
+          to: ${{ secrets.MAIL_TO || secrets.MAIL_USERNAME }}
+          from: Paragraf <${{ secrets.MAIL_USERNAME }}>
+          body: file://mail_body.txt
+
+      - name: Zapisz stan obserwowanych (commit)
+        run: |
+          git config user.name "paragraf-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add stan_obserwowanych.json
+          git commit -m "Aktualizacja stanu obserwowanych" || echo "Brak zmian stanu — nic do zapisania"
+          git push || echo "Nic do wypchnięcia"
