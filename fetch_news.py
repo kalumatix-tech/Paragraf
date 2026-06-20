@@ -442,6 +442,45 @@ def _rcl_parse_into(html_text, out, seen):
             return
 
 
+_RCL_STAGE_KW = ("lobbing", "uzgodnie", "konsultacj", "opiniowan", "komitet", "komisj",
+                 "rada ministr", "radzie ministr", "potwierdz", "skierowan", "notyfikacj",
+                 "rozpatrz", "przyjęc", "przyjet")
+
+
+def _rcl_stages(page_text):
+    """Wyciąga wewnętrzne etapy rządowe ze STRONY projektu RCL
+    (np. Uzgodnienia / Konsultacje / Opiniowanie / Komitet Stały / Komisja Prawnicza).
+    Zwraca listę {n, name, date, state} gdzie state ∈ done|cur|pending."""
+    if not page_text:
+        return []
+    t = re.sub(r"<[^>]*>", " ", page_text)
+    t = re.sub(r"[·•|]", " ", t)
+    t = re.sub(r"\s+", " ", t)
+    items = []
+    pat = re.compile(r"(\d{1,2})\.\s+(.{3,75}?)"
+                     r"(?=\s+Data ostatniej modyfikacji:|\s+\d{1,2}\.\s|\s+Rządowe Centrum|"
+                     r"\s+Mapa strony|\s+Pomoc\b|\s+Kontakt\b|$)"
+                     r"(?:\s+Data ostatniej modyfikacji:\s*(\d{2}-\d{2}-\d{4}))?")
+    seen = set()
+    for m in pat.finditer(t):
+        name = re.sub(r"\s*Data ostatniej modyfikacji.*$", "", m.group(2)).strip()
+        low = name.lower()
+        if not any(k in low for k in _RCL_STAGE_KW):
+            continue
+        key = (m.group(1), low[:20])
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append({"n": int(m.group(1)), "name": name, "date": m.group(3)})
+    if not items:
+        return []
+    dated = [i for i, it in enumerate(items) if it["date"]]
+    cur = max(dated) if dated else 0
+    for i, it in enumerate(items):
+        it["state"] = "done" if i < cur else ("cur" if i == cur else "pending")
+    return items
+
+
 def _rcl_status(page_text):
     """Rozpoznaje status projektu z jego STRONY (nie z listy):
     'left'  – opuścił rząd (dalszy ciąg w Sejmie/Dz.U.),
@@ -460,11 +499,14 @@ def _rcl_status(page_text):
 
 def _rcl_keep_in_gov(items, limit=12):
     """Tracker 'w rządzie' pokazuje TYLKO projekty realnie w rządzie.
-    Sprawdzamy stronę każdego (do `limit`); te, które poszły dalej, odpadają."""
+    Sprawdzamy stronę każdego (do `limit`); te, które poszły dalej, odpadają.
+    Przy okazji doczepiamy wewnętrzne etapy rządowe do karty."""
     kept = []
     for it in items[:limit]:
-        st = _rcl_status(_http_get_text(it["link"], timeout=12))
+        page = _http_get_text(it["link"], timeout=12)
+        st = _rcl_status(page)
         if st in (None, "in_gov"):     # None = brak pobrania -> zostaw (świeże z listy)
+            it["stages"] = _rcl_stages(page)
             kept.append(it)
     return kept
 
@@ -873,6 +915,26 @@ TEMPLATE = r'''<!DOCTYPE html>
     border-radius:6px;padding:6px 9px;line-height:1.4}
   .lcard.is-closed{opacity:.62}
   .lcard.is-left{border-left-color:#1d3a6b}
+  /* rozwijana karta etapów rządowych (RCL) */
+  .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+    gap:10px;padding:8px 11px;background:rgba(138,46,42,.05);font-size:12.5px}
+  .rclproc summary::-webkit-details-marker{display:none}
+  .rp-now{font-weight:600;color:var(--ink)}
+  .rp-tog{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--ink-faint);white-space:nowrap}
+  .rp-tog::after{content:" ▾"}
+  .rclproc[open] .rp-tog::after{content:" ▴"}
+  .rp-list{list-style:none;margin:0;padding:9px 12px 11px}
+  .rp-list li{position:relative;padding:4px 0 4px 20px;font-size:12px;color:var(--ink-faint);line-height:1.35}
+  .rp-list li::before{content:"";position:absolute;left:3px;top:8px;width:8px;height:8px;border-radius:50%;
+    border:1.5px solid var(--line);background:var(--paper);box-sizing:border-box}
+  .rp-list li.rp-done{color:var(--ink-soft)}
+  .rp-list li.rp-done::before{background:var(--accent);border-color:var(--accent)}
+  .rp-list li.rp-cur{color:var(--ink);font-weight:600}
+  .rp-list li.rp-cur::before{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(138,46,42,.18)}
+  .rp-list li i{font-style:normal;color:var(--ink-faint);font-size:10.5px;margin-left:7px}
+  .rp-link{display:inline-block;margin-top:8px;font-size:12px;color:var(--accent);text-decoration:none}
+  .rp-link:hover{text-decoration:underline}
 
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -1016,17 +1078,49 @@ function rclStatus(t){
   if(/status projektu:\s*zamkn/.test(low)) return "closed";
   return "in_gov";
 }
+const RCL_STAGE_KW=["lobbing","uzgodnie","konsultacj","opiniowan","komitet","komisj","rada ministr","radzie ministr","potwierdz","skierowan","notyfikacj","rozpatrz","przyjęc","przyjet"];
+function rclStages(text){
+  if(!text) return [];
+  const t=text.replace(/<[^>]*>/g," ").replace(/[·•|]/g," ").replace(/\s+/g," ");
+  const re=/(\d{1,2})\.\s+([\s\S]{3,75}?)(?=\s+Data ostatniej modyfikacji:|\s+\d{1,2}\.\s|\s+Rządowe Centrum|\s+Mapa strony|\s+Pomoc\b|\s+Kontakt\b|$)(?:\s+Data ostatniej modyfikacji:\s*(\d{2}-\d{2}-\d{4}))?/g;
+  const items=[]; const seen=new Set(); let m;
+  while((m=re.exec(t))){
+    const name=m[2].replace(/\s*Data ostatniej modyfikacji.*$/,"").trim();
+    const low=name.toLowerCase();
+    if(!RCL_STAGE_KW.some(k=>low.includes(k))) continue;
+    const key=m[1]+"|"+low.slice(0,20);
+    if(seen.has(key)) continue; seen.add(key);
+    items.push({n:+m[1], name, date:m[3]||null});
+  }
+  if(!items.length) return [];
+  let cur=0; items.forEach((it,i)=>{ if(it.date) cur=i; });
+  items.forEach((it,i)=>{ it.state = i<cur?"done":(i===cur?"cur":"pending"); });
+  return items;
+}
 function legisCard(it){
   const when = ago(it._d) || "—";
-  const stage = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
-  const stp = it.left ? stepper(1, true) : stepper(it.step||1);
-  const note = it.left ? `<div class="lnote">→ projekt opuścił etap rządowy; dalszy ciąg w Sejmie / Dz.U. (sprawdź na stronie projektu)</div>` : "";
+  const stageLine = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
+  const isRclGov = (it.src||"").indexOf("RCL")>=0 && !it.left && !it.closed;
+  let body;
+  if(it.stages && it.stages.length){
+    const cur = it.stages.find(s=>s.state==="cur") || it.stages[it.stages.length-1];
+    body = `<details class="rclproc">
+      <summary><span class="rp-now">W rządzie: ${esc(cur?cur.name:"—")}</span><span class="rp-tog">etapy</span></summary>
+      <ol class="rp-list">${it.stages.map(s=>`<li class="rp-${s.state}">${esc(s.name)}${s.date?`<i>${esc(s.date)}</i>`:""}</li>`).join("")}</ol>
+    </details>`;
+  } else if(it.left){
+    body = stepper(1, true) + `<div class="lnote">→ projekt opuścił etap rządowy; dalszy ciąg w Sejmie / Dz.U. (sprawdź na stronie projektu)</div>`;
+  } else if(it.closed){
+    body = stageLine;
+  } else if(isRclGov){
+    body = stageLine + `<a class="rp-link" href="${esc(it.link)}" target="_blank" rel="noopener">Zobacz etapy procesu w RCL →</a>`;
+  } else {
+    body = stepper(it.step||1) + stageLine;
+  }
   return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''}" style="--ccol:${it.color}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lwhen">${esc(when)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-    ${stp}
-    ${stage}
-    ${note}
+    ${body}
   </article>`;
 }
 
@@ -1083,11 +1177,12 @@ async function liveSearch(){
       }
       // Etap odczytujemy ze STRONY projektu (lista go nie pokazuje).
       for(const c of cand){
-        const st = rclStatus(await getText(c.link));
+        const page = await getText(c.link);
+        const st = rclStatus(page);
         const base={title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
         if(st==="left")        out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
         else if(st==="closed") out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
-        else if(st==="in_gov") out.push({...base, stage:"Prace w rządzie"});
+        else if(st==="in_gov") out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
         else                   out.push({...base, stage:"Etap rządowy — sprawdź szczegóły w RCL"});
       }
     }
