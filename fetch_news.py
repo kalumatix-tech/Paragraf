@@ -404,20 +404,22 @@ def _http_get_text(url: str, timeout: int = 25):
 
 
 def _rcl_parse_into(html_text, out, seen):
-    """Wyłuskuje projekty z jednej strony HTML listy RCL do out (deduplikacja po seen)."""
+    """Wyłuskuje projekty z jednej strony HTML listy RCL do out (deduplikacja po seen).
+    Odporne na zagnieżdżone znaczniki w treści linku."""
     if not html_text:
         return
-    for m in re.finditer(r'href="(/projekt/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*</a>', html_text):
+    for m in re.finditer(r'href="(/projekt/\d+[^"]*)"[^>]*>(.*?)</a>', html_text, re.DOTALL):
         path = m.group(1)
         if path in seen:
             continue
-        title = re.sub(r"\s+", " ", html.unescape(m.group(2))).strip()
-        if not title or not _topic_ok(title):
+        inner = re.sub(r"<[^>]*>", " ", m.group(2))          # zdejmij ewentualne tagi w środku
+        title = re.sub(r"\s+", " ", html.unescape(inner)).strip()
+        if len(title) < 6 or not _topic_ok(title):
             continue
         seen.add(path)
         tail = html_text[m.end():m.end() + 600]
-        # Numer (UD116 itp.) bierzemy z WŁASNEGO tytułu, żeby nie przykleić sąsiedniego.
-        num = re.search(r"\b([A-Z]{2}\d{1,4})\b", title)
+        # Numer (UD116 itp.) bierzemy z WŁASNEGO tytułu lub z najbliższego otoczenia.
+        num = re.search(r"\b([A-Z]{2}\d{1,4})\b", title) or re.search(r"\b([A-Z]{2}\d{1,4})\b", tail[:120])
         dm = re.search(r"\b(\d{2})-(\d{2})-(\d{4})\b", tail)
         date = None
         if dm:
@@ -447,17 +449,17 @@ def _rcl_projects():
     STARSZE projekty (np. UD116), oraz (2) najnowsze strony listy."""
     out, seen = [], set()
     base = "https://legislacja.rcl.gov.pl/lista?typeId=2"   # typeId=2 = projekty ustaw
-    # (1) Wyszukiwarka RCL po kluczowych hasłach podatkowych
-    for kw in ("podatek", "VAT", "akcyza", "KSeF", "PIT", "CIT"):
+    # (1) Wyszukiwarka RCL po hasłach podatkowych (param `title`) — łapie też starsze.
+    for kw in ("podatek", "podatku", "VAT", "akcyza", "KSeF", "PIT", "CIT", "Krajowy System e-Faktur"):
         if len(out) >= RCL_MAX:
             break
-        url = f"{base}&searchString={urllib.parse.quote(kw)}"
+        url = f"{base}&title={urllib.parse.quote(kw)}"
         _rcl_parse_into(_http_get_text(url, timeout=20), out, seen)
-    # (2) Najnowsze strony listy (świeży przegląd procesu)
+    # (2) Najnowsze strony listy (świeży przegląd procesu); paginacja = `pNumber`.
     for page in range(1, RCL_PAGES + 1):
         if len(out) >= RCL_MAX:
             break
-        url = base if page == 1 else f"{base}&page={page}"
+        url = base if page == 1 else f"{base}&pNumber={page}"
         _rcl_parse_into(_http_get_text(url, timeout=20), out, seen)
     print(f"  [Rząd (RCL)] dopasowano {len(out)} projektów rządowych.")
     return out
@@ -995,13 +997,14 @@ const PROXIES = [
   u => u,
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
   u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+  u => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u),
 ];
 async function getJSON(u){
   for(const p of PROXIES){ try{ const r=await fetch(p(u)); if(r.ok) return await r.json(); }catch(e){} }
   return null;
 }
 async function getText(u){
-  for(const p of [PROXIES[1],PROXIES[2],PROXIES[0]]){ try{ const r=await fetch(p(u)); if(r.ok) return await r.text(); }catch(e){} }
+  for(const p of [PROXIES[1],PROXIES[2],PROXIES[3],PROXIES[0]]){ try{ const r=await fetch(p(u)); if(r.ok){ const t=await r.text(); if(t && t.length>50) return t; } }catch(e){} }
   return null;
 }
 async function liveSearch(){
@@ -1022,20 +1025,29 @@ async function liveSearch(){
         }
       }
     }
-    const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&searchString=${encodeURIComponent(q)}`);
+    // RCL — etap rządowy. Numer z wykazu (UD116/UC55) -> number=, inaczej title=.
+    const numLike = /^[A-Za-z]{2}\s?\d{1,4}$/.test(q);
+    const rclQ = numLike ? "number=" + encodeURIComponent(q.replace(/\s+/g,"").toUpperCase())
+                         : "title=" + encodeURIComponent(q);
+    const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&${rclQ}`);
     if(htmlTxt){
-      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>\s*([^<]{8,}?)\s*<\/a>/g; let m; const seen=new Set();
+      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set();
       while((m=re.exec(htmlTxt))){
         if(seen.has(m[1])) continue; seen.add(m[1]);
-        out.push({title:m[2].replace(/\s+/g," ").trim(), link:"https://legislacja.rcl.gov.pl"+m[1],
+        const t=m[2].replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
+        if(t.length<6) continue;
+        out.push({title:t, link:"https://legislacja.rcl.gov.pl"+m[1],
           src:"Rząd (RCL)", color:"#8a5a2e", stage:"Prace w rządzie", step:1, _d:null});
-        if(seen.size>=20) break;
+        if(seen.size>=25) break;
       }
     }
   }catch(e){}
   btn.disabled=false;
   if(!out.length){
-    box.innerHTML=`<div class="live-status">Nic nie znalazłem na żywo dla „${esc(q)}". Spróbuj innego słowa lub numeru. Jeśli to się powtarza — przekaźnik danych mógł chwilowo nie odpowiedzieć, kliknij jeszcze raz.</div>`;
+    const numHint = /^[A-Za-z]{2}\s?\d{1,4}$/.test(q)
+      ? ` „${esc(q)}" wygląda na numer projektu rządowego (RCL). RCL nie ma publicznego API i bywa kapryśny przez przekaźnik — kliknij jeszcze raz, a jeśli dalej cisza, projekt może być już w Sejmie (wtedy szukaj po tytule lub nr druku).`
+      : "";
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem na żywo dla „${esc(q)}".${numHint || " Spróbuj innego słowa lub numeru. Jeśli to się powtarza — przekaźnik danych mógł chwilowo nie odpowiedzieć, kliknij jeszcze raz."}</div>`;
     return;
   }
   box.innerHTML=`<div class="live-sec-head">Wyniki na żywo dla „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
