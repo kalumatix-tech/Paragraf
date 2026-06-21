@@ -478,8 +478,21 @@ def _rcl_stages(page_text):
         items.append({"n": int(m.group(1)), "name": name, "date": m.group(3)})
     if not items:
         return []
+    # Strona RCL bywa uporzadkowana niechronologicznie (czasem od najnowszego).
+    # Sortujemy etapy po dacie rosnaco (niedatowane = wczesne, na poczatek),
+    # zeby daty szly w dol i "biezacy" byl naprawde najpozniejszy.
+    def _dkey(it):
+        d = it.get("date")
+        if d:
+            try:
+                dd, mm, yy = d.split("-")
+                return (1, int(yy), int(mm), int(dd))
+            except Exception:
+                pass
+        return (0, 0, 0, 0)
+    items.sort(key=_dkey)
     dated = [i for i, it in enumerate(items) if it["date"]]
-    cur = max(dated) if dated else 0
+    cur = dated[-1] if dated else 0
     for i, it in enumerate(items):
         it["state"] = "done" if i < cur else ("cur" if i == cur else "pending")
     return items
@@ -884,13 +897,20 @@ TEMPLATE = r'''<!DOCTYPE html>
   footer b{color:var(--ink-soft)}
 
   /* --- Zakładki --- */
-  .tabs{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tab{appearance:none;border:none;background:none;cursor:pointer;font-family:var(--sans);
     font-size:14.5px;font-weight:600;color:var(--ink-faint);padding:10px 16px;position:relative;
     border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
   .tab:hover{color:var(--ink-soft)}
   .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
   .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  /* drugi poziom: czlonkowie sekcji (Narzedzia / Prawo) */
+  .memberbar{display:flex;gap:3px;margin:-4px 0 18px;flex-wrap:wrap}
+  .memtab{appearance:none;border:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;
+    color:var(--ink-faint);background:none;padding:6px 14px;border-radius:8px;transition:all .14s}
+  .memtab:hover{color:var(--ink-soft);background:rgba(40,30,20,.04)}
+  .memtab.on{color:var(--accent);background:rgba(138,46,42,.09)}
+  .memtab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   [hidden]{display:none!important}
   .showall{display:block;width:100%;margin-top:16px;padding:11px;background:var(--surface);
     border:1px solid var(--line);border-radius:var(--radius);cursor:pointer;font-family:var(--sans);
@@ -916,6 +936,11 @@ TEMPLATE = r'''<!DOCTYPE html>
   .lsec-head{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
   .lsec-head .lt{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--ink)}
   .lsec-head .lcount{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  /* sekcja "Wchodza w zycie wkrotce" - wydzielona bursztynowa karta, zeby nie zlewala sie z Dz.U. */
+  #legisSoon:not(:empty){display:block;margin:2px 0 26px;padding:15px 16px 6px;
+    background:rgba(176,124,42,.07);border:1px solid rgba(176,124,42,.3);border-radius:13px}
+  #legisSoon .lsec-head{border-bottom-color:#b07c2a;margin-bottom:10px}
+  #legisSoon .lsec-head .lt{color:#8a5a2e}
   .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
   .lcard{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ccol,var(--accent));
     border-radius:var(--radius);padding:15px 17px 14px;display:flex;flex-direction:column}
@@ -1203,16 +1228,13 @@ TEMPLATE = r'''<!DOCTYPE html>
 
   <div class="wrap">
     <nav class="tabs">
-      <button class="tab on" data-tab="news">Wiadomości<span class="tabbadge" id="newsBadge"></span></button>
-      <button class="tab" data-tab="terminy">Terminy</button>
-      <button class="tab" data-tab="kursy">Kursy</button>
-      <button class="tab" data-tab="stawki">Stawki</button>
-      <button class="tab" data-tab="kalk">Kalkulator</button>
-      <button class="tab" data-tab="legis">Ustawy</button>
-      <button class="tab" data-tab="wyroki">Wyroki</button>
-      <button class="tab" data-tab="kis">Interpretacje</button>
-      <button class="tab" data-tab="moje">Moje<span class="tabbadge" id="mojeBadge"></span></button>
+      <button class="tab on" data-section="news">Wiadomości<span class="tabbadge" id="newsBadge"></span></button>
+      <button class="tab" data-section="terminy">Terminy</button>
+      <button class="tab" data-section="narzedzia">Narzędzia</button>
+      <button class="tab" data-section="prawo">Prawo</button>
+      <button class="tab" data-section="moje">Moje<span class="tabbadge" id="mojeBadge"></span></button>
     </nav>
+    <div class="memberbar" id="memberBar" hidden></div>
 
     <section id="newsView">
       <div class="controls">
@@ -1354,9 +1376,87 @@ TEMPLATE = r'''<!DOCTYPE html>
           <label class="kin"><span>Koszty / rok</span><input id="spK" type="number" inputmode="decimal" value="100000" min="0" step="any"></label>
           <label class="kin"><span>Wynagrodzenie zarządu — powołanie / rok</span><input id="spPow" type="number" inputmode="decimal" value="0" min="0" step="any"></label>
           <label class="kin kin-chk"><input id="spMaly" type="checkbox" checked><span>Mały podatnik (CIT 9% / estoński 10%)</span></label>
+          <label class="kin kin-chk"><input id="spDyw" type="checkbox" checked><span>Wypłata dywidendy do właściciela</span></label>
         </div>
         <div id="spzooResults"></div>
-        <p class="livehint" style="margin-top:10px">Porównanie przy <b>pełnej wypłacie zysku</b>. „Klasyczna" = CIT (9%/19%) + 19% PIT od dywidendy (podwójne opodatkowanie). „Estoński CIT" = brak CIT do czasu wypłaty, a przy wypłacie CIT 10%/20% + obniżony PIT od dywidendy (łącznie ok. 20%/25%). Wynagrodzenie z powołania zmniejsza zysk i jest opodatkowane PIT 12% + 9% zdrowotnej (bez ZUS społecznego). Orientacyjnie — nie jest to porada podatkowa.</p>
+        <p class="livehint" style="margin-top:10px"><b>Wypłata dywidendy</b> włączona = pełna wypłata zysku do właściciela (podwójne opodatkowanie). Wyłączona = zysk zostaje w spółce: w klasycznym CIT podatek od zysku i tak jest należny co roku, a w <b>estońskim CIT podatku nie ma w ogóle do czasu wypłaty</b> — to jego główna przewaga. „Klasyczna" = CIT 9%/19% + 19% PIT od dywidendy. „Estoński CIT" przy wypłacie: CIT 10%/20% + obniżony PIT (łącznie ok. 20%/25%). Powołanie zmniejsza zysk i jest opodatkowane PIT 12% + 9% zdrowotnej (bez ZUS społecznego). Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
+
+      <div id="kalkEtat">
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Wynagrodzenie brutto / miesiąc</span><input id="etP" type="number" inputmode="decimal" value="5000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty uzyskania (KUP) / rok</span><input id="etKup" type="number" inputmode="decimal" value="3000" min="0" step="any"></label>
+        </div>
+        <div id="etatResults"></div>
+        <p class="livehint" style="margin-top:10px">Umowa o pracę, opodatkowanie skalą (12%/32%, kwota zmniejszająca 3 600 zł). ZUS pracownika: emerytalna 9,76% + rentowa 1,5% (do limitu 30-krotności 282 600 zł) + chorobowa 2,45%. KUP standardowo 3 000 zł/rok (250 zł/mc); przy pracy poza miejscem zamieszkania wpisz 3 600 zł. <b>Nie obejmuje składek po stronie pracodawcy.</b> Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
+
+      <div id="kalkJdgUop">
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Przychód z DG / rok (netto)</span><input id="juP" type="number" inputmode="decimal" value="50000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty DG / rok</span><input id="juK" type="number" inputmode="decimal" value="10000" min="0" step="any"></label>
+          <label class="kin"><span>ZUS z DG / rok</span><input id="juZus" type="number" inputmode="decimal" value="21459.48" min="0" step="any"></label>
+          <label class="kin"><span>Wynagrodzenie z UoP brutto / miesiąc</span><input id="juMg" type="number" inputmode="decimal" value="4000" min="0" step="any"></label>
+          <label class="kin"><span>KUP z UoP / rok</span><input id="juKup" type="number" inputmode="decimal" value="3000" min="0" step="any"></label>
+        </div>
+        <div id="jdgUopResults"></div>
+        <p class="livehint" style="margin-top:10px">Działalność na <b>skali</b> łączona z etatem — dochody sumują się do jednej podstawy skali (próg 120 tys. liczony łącznie). Zdrowotna z DG 9% (min. 5 190,48 zł), zdrowotna i ZUS z UoP liczone osobno i doliczane. ZUS z DG wpisz wg swojego schematu (pełny 2026 = 21 459,48 zł). Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
+
+      <div id="kalkOsobowa">
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Przychód spółki / rok (netto)</span><input id="osP" type="number" inputmode="decimal" value="600000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty spółki / rok</span><input id="osK" type="number" inputmode="decimal" value="200000" min="0" step="any"></label>
+          <label class="kin"><span>Twój udział w zysku (%)</span><input id="osShare" type="number" inputmode="decimal" value="50" min="0" max="100" step="any"></label>
+          <label class="kin"><span>Schemat ZUS</span><select id="osZus">
+            <option value="pelny" selected>Pełny ZUS (duży)</option>
+            <option value="pref">Preferencyjny (mały, 24 mies.)</option>
+            <option value="plus">Mały ZUS Plus</option>
+            <option value="ulga">Ulga na start (6 mies.)</option>
+          </select></label>
+          <label class="kin kin-chk"><input id="osChor" type="checkbox"><span>Ubezpieczenie chorobowe</span></label>
+          <label class="kin"><span>Stawka ryczałtu</span><select id="osR">
+            <option value="0.17">17%</option><option value="0.15">15%</option><option value="0.14">14%</option>
+            <option value="0.125">12,5%</option><option value="0.12">12%</option><option value="0.10">10%</option>
+            <option value="0.085" selected>8,5%</option><option value="0.055">5,5%</option><option value="0.03">3%</option><option value="0.02">2%</option>
+          </select></label>
+        </div>
+        <div id="osResults"></div>
+        <p class="livehint" style="margin-top:10px">Spółka „wieloosobowa" niebędąca podatnikiem CIT (jawna osób fizycznych, cywilna, partnerska) — <b>spółka nie płaci podatku</b>, każdy wspólnik rozlicza swój udział w zysku jak JDG. Podaj przychód i koszty całej spółki oraz swój udział — policzę Twoją część i porównam liniowy / ryczałt / skalę. Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
+
+      <div id="kalkKomandyt">
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Przychód spółki / rok (netto)</span><input id="komP" type="number" inputmode="decimal" value="300000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty spółki / rok</span><input id="komK" type="number" inputmode="decimal" value="100000" min="0" step="any"></label>
+          <label class="kin"><span>Liczba wspólników (osób fiz.)</span><input id="komN" type="number" inputmode="numeric" value="1" min="1" step="1"></label>
+          <label class="kin kin-chk"><input id="komMaly" type="checkbox" checked><span>Mały podatnik (CIT 9%)</span></label>
+        </div>
+        <div id="komResults"></div>
+        <p class="livehint" style="margin-top:10px">Spółka komandytowa płaci <b>CIT</b> od dochodu (9% mały podatnik / 19%), a wypłata zysku jest opodatkowana PIT 19% u wspólnika. Różnica: <b>komandytariusz</b> („tradycyjna") płaci pełne 19% (podwójne opodatkowanie), a <b>komplementariusz</b> („roszada") odlicza CIT spółki od swojego PIT — stąd niższe obciążenie. ZUS i zdrowotna liczone na każdego wspólnika. Zakłada pełną wypłatę zysku po CIT. Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
+
+      <div id="kalkLacznie">
+      <div class="controls">
+        <div id="lacMode" class="srcToggle" style="margin-bottom:12px">
+          <button class="srcbtn on" data-mode="malzonkowie">Małżonkowie</button>
+          <button class="srcbtn" data-mode="rodzic">Samotny rodzic</button>
+        </div>
+        <div class="kalk-inputs">
+          <label class="kin"><span id="lacALbl">Dochód do opodatkowania — małżonek A / rok</span><input id="lacA" type="number" inputmode="decimal" value="178540" min="0" step="any"></label>
+          <label class="kin" id="lacBWrap"><span>Dochód do opodatkowania — małżonek B / rok</span><input id="lacB" type="number" inputmode="decimal" value="0" min="0" step="any"></label>
+        </div>
+        <div id="lacResults"></div>
+        <p class="livehint" style="margin-top:10px">Wspólne rozliczenie skalą: sumę dochodów dzieli się na pół, liczy podatek od połowy i mnoży ×2 — korzyść rośnie, gdy jedna osoba zarabia dużo mniej (niewykorzystany próg 12% i kwota wolna „przechodzą"). <b>Samotny rodzic</b> rozlicza tak swój dochód z dzieckiem. Wpisz <b>roczny dochód do opodatkowania</b> (po odliczeniu ZUS). ZUS i składka zdrowotna są takie same niezależnie od sposobu rozliczenia. Orientacyjnie — nie jest to porada podatkowa.</p>
       </div>
       </div>
     </section>
@@ -1564,6 +1664,10 @@ function rclStages(text){
     items.push({n:+m[1], name, date:m[3]||null});
   }
   if(!items.length) return [];
+  // sortuj chronologicznie (niedatowane na poczatek), zeby daty szly w dol
+  const dkey=d=>{ const m=String(d||"").match(/(\d{2})-(\d{2})-(\d{4})/); return m?(+m[3])*10000+(+m[2])*100+(+m[1]):-1; };
+  items.sort((a,b)=>{ const ka=dkey(a.date), kb=dkey(b.date);
+    if(ka<0&&kb<0) return 0; if(ka<0) return -1; if(kb<0) return 1; return ka-kb; });
   let cur=0; items.forEach((it,i)=>{ if(it.date) cur=i; });
   items.forEach((it,i)=>{ it.state = i<cur?"done":(i===cur?"cur":"pending"); });
   return items;
@@ -1626,8 +1730,11 @@ const LEGIS_DEFAULT = 18;
 // ---- WYSZUKIWANIE NA ŻYWO (Dz.U. + RCL) ----
 // Statyczna strona nie ma serwera, więc próbujemy bezpośrednio, a gdy
 // przeglądarka zablokuje (CORS) — przez darmowy przekaźnik. Dane publiczne.
+// Wlasny Cloudflare Worker (niezawodny przekaznik). Pusty string = wylaczony.
+const WORKER_BASE = "https://cbosworker.kalumatix.workers.dev";
 const PXY = [
   u => u,
+  ...(WORKER_BASE ? [u => WORKER_BASE + "/proxy?url=" + encodeURIComponent(u)] : []),
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
   u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
   u => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u),
@@ -1653,7 +1760,7 @@ async function getJSON(u, fresh){
 }
 async function getText(u, fresh){
   if(!fresh && _cache.has("t"+u)) return _cache.get("t"+u);
-  const v = await _race([PXY[1],PXY[2],PXY[3],PXY[0]].map(p=>p(u)), true);
+  const v = await _race(PXY.map(p=>p(u)), true);
   if(v!=null) _cache.set("t"+u, v);
   return v;
 }
@@ -2672,36 +2779,37 @@ function renderKalk(){
 }
 
 // --- kalkulator sp. z o.o.: klasyczna (CIT) vs estonski CIT (wzory z arkusza) ---
-function calcSpzoo(P,K,powolanie,maly){
+function calcSpzoo(P,K,powolanie,maly,dyw){
   const zysk=Math.max(P-K,0);
   const zyskPoPow=Math.max(zysk-powolanie,0);
   // powolanie: PIT 12% (po odliczeniu 3000+30000) + 9% zdrowotnej od calosci
   const pitPow = Math.max(0,(powolanie-3000-30000)*0.12) + 0.09*powolanie;
-  // KLASYCZNA: CIT od zysku, potem 19% PIT od dywidendy (podwojne opodatkowanie)
+  // KLASYCZNA: CIT od zysku nalezny CO ROKU; 19% PIT od dywidendy tylko przy wyplacie
   const citK = zyskPoPow*(maly?0.09:0.19);
-  const pitDywK = (zyskPoPow-citK)*0.19;
+  const pitDywK = dyw ? (zyskPoPow-citK)*0.19 : 0;
   const sumaK = citK+pitDywK+pitPow;
-  // ESTONSKI: CIT 10/20% przy wyplacie, PIT 19% od dywidendy minus 90/70% CIT
-  const citE = zyskPoPow*(maly?0.10:0.20);
-  const pitDywE = Math.max(zyskPoPow*0.19 - (maly?citE*0.9:citE*0.7), 0);
+  // ESTONSKI: brak podatku do czasu wyplaty; przy wyplacie CIT 10/20% + PIT pomniejszony
+  const citE = dyw ? zyskPoPow*(maly?0.10:0.20) : 0;
+  const pitDywE = dyw ? Math.max(zyskPoPow*0.19 - (maly?citE*0.9:citE*0.7), 0) : 0;
   const sumaE = citE+pitDywE+pitPow;
   const mk=(cit,pitDyw,suma)=>({cit,pitDyw,pitPow,suma,netto:zysk-suma,stopa:zysk?suma/zysk:null});
-  return { zysk, klas:mk(citK,pitDywK,sumaK), est:mk(citE,pitDywE,sumaE) };
+  return { zysk, dyw, klas:mk(citK,pitDywK,sumaK), est:mk(citE,pitDywE,sumaE) };
 }
 function renderSpzoo(){
   const box=$("#spzooResults"); if(!box) return;
   if(!box.dataset.wired){
     box.dataset.wired="1";
     ["#spP","#spK","#spPow"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",renderSpzoo); });
-    const m=$("#spMaly"); if(m) m.addEventListener("change",renderSpzoo);
+    ["#spMaly","#spDyw"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",renderSpzoo); });
   }
-  const P=kalkNum("#spP"),K=kalkNum("#spK"),pow=kalkNum("#spPow"),maly=!!(($("#spMaly")||{}).checked);
-  const res=calcSpzoo(P,K,pow,maly);
+  const P=kalkNum("#spP"),K=kalkNum("#spK"),pow=kalkNum("#spPow"),maly=!!(($("#spMaly")||{}).checked),dyw=!!(($("#spDyw")||{}).checked);
+  const res=calcSpzoo(P,K,pow,maly,dyw);
   const forms=[["Klasyczna (CIT + 19% dywidenda)",res.klas],["Estoński CIT",res.est]];
   let best=null; forms.forEach(([_,f])=>{ if(best===null||f.suma<best) best=f.suma; });
   const card=(name,f)=>{
     const isBest=best!==null && Math.abs(f.suma-best)<0.005;
-    const rows=[["CIT",f.cit],["PIT od dywidendy",f.pitDyw]];
+    const rows=[["CIT",f.cit]];
+    if(res.dyw) rows.push(["PIT od dywidendy",f.pitDyw]);
     if(f.pitPow>0) rows.push(["PIT + zdrow. (powołanie)",f.pitPow]);
     const rh=rows.map(x=>`<div class="kr"><span>${x[0]}</span><b>${plPLN(x[1])}</b></div>`).join("");
     return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">korzystniej</div>':''}
@@ -2711,8 +2819,170 @@ function renderSpzoo(){
       <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.netto)}</b></div>
     </div>`;
   };
-  box.innerHTML=`<div class="kc-dochod">Zysk spółki (przychód − koszty): <b>${plPLN(res.zysk)}</b> · przy pełnej wypłacie zysku</div>`
+  const scen = res.dyw ? "przy pełnej wypłacie zysku" : "zysk zatrzymany w spółce — bez wypłaty dywidendy";
+  box.innerHTML=`<div class="kc-dochod">Zysk spółki (przychód − koszty): <b>${plPLN(res.zysk)}</b> · ${esc(scen)}</div>`
     +`<div class="kgrid">${forms.map(f=>card(f[0],f[1])).join("")}</div>`;
+}
+
+// ===== Kalkulatory dodatkowe: etat, JDG+etat, spolka osobowa, komandytowa, laczne =====
+function kalkRows(rows){ return rows.map(x=>`<div class="kr"><span>${x[0]}</span><b>${plPLN(x[1])}</b></div>`).join(""); }
+function jdgCard(name,f,best){
+  if(!f) return `<div class="kc kc-off"><div class="kc-h">${esc(name)}</div><div class="kc-na">Niedostępny — przychód powyżej limitu 2 mln EUR.</div></div>`;
+  const isBest=best!==null && Math.abs(f.suma-best)<0.005;
+  const rows=[["PIT",f.pit],["Składka zdrowotna",f.zdrow],["ZUS społeczny",f.zus]];
+  if(f.danina>0) rows.push(["Danina solidarn.",f.danina]);
+  return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">najkorzystniej</div>':''}
+    <div class="kc-h">${esc(name)}</div>${kalkRows(rows)}
+    <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+    <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+    <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.netto)}</b></div>
+    <div class="kr"><span>Zostaje (mies.)</span><b>${plPLN(f.netto/12)}</b></div>
+  </div>`;
+}
+const ZUS_CAP_2026 = 282600;  // 30-krotnosc przecietnego wynagrodzenia (limit emerytalnej+rentowej)
+function uopZus(P){ const base=Math.min(P,ZUS_CAP_2026); return base*0.0976 + base*0.015 + P*0.0245; }
+function skalaPIT(pod){ return Math.max(pod>0?(Math.min(pod,120000)*0.12+Math.max(pod-120000,0)*0.32-3600):0,0); }
+
+// --- Etat (umowa o prace) ---
+function calcEtat(mg,kup){
+  const P=mg*12;
+  const zus=uopZus(P);
+  const doch=P-kup, pod=doch-zus;
+  const pit=skalaPIT(pod);
+  const zdrow=0.09*(P-zus);
+  const danina=pod>1000000?(pod-1000000)*0.04:0;
+  const suma=pit+zus+zdrow+danina;
+  return {P,zus,zdrow,pit,danina,suma,nettoY:P-suma,nettoM:(P-suma)/12,stopa:P?suma/P:null};
+}
+function renderEtat(){
+  const box=$("#etatResults"); if(!box) return;
+  if(!box.dataset.wired){ box.dataset.wired="1"; ["#etP","#etKup"].forEach(id=>{const el=$(id);if(el)el.addEventListener("input",renderEtat);}); }
+  const f=calcEtat(kalkNum("#etP"),kalkNum("#etKup"));
+  const rows=[["PIT (skala)",f.pit],["Składka zdrowotna",f.zdrow],["ZUS (Twoja część)",f.zus]];
+  if(f.danina>0) rows.push(["Danina solidarn.",f.danina]);
+  box.innerHTML=`<div class="kc-dochod">Przychód roczny brutto: <b>${plPLN(f.P)}</b></div>
+    <div class="kgrid"><div class="kc"><div class="kc-h">Umowa o pracę (etat)</div>${kalkRows(rows)}
+      <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+      <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+      <div class="kr kr-net"><span>Na rękę (rok)</span><b>${plPLN(f.nettoY)}</b></div>
+      <div class="kr"><span>Na rękę (mies.)</span><b>${plPLN(f.nettoM)}</b></div>
+    </div></div>`;
+}
+
+// --- JDG (skala) + etat ---
+function calcJdgUop(dgP,dgK,dgZus,mg,kup){
+  const dgD=dgP-dgK;
+  const dgZdrow=Math.max(0.09*(dgD-dgZus),HEALTH_MIN_2026);
+  const dgPod=dgD-dgZus;
+  const uP=mg*12, uZus=uopZus(uP), uDoch=uP-kup, uZdrow=0.09*(uP-uZus);
+  const pod=dgPod+uDoch-uZus;
+  const pit=skalaPIT(pod);
+  const danina=pod>1000000?(pod-1000000)*0.04:0;
+  const suma=pit+danina+dgZus+dgZdrow+uZdrow+uZus;
+  const nettoY=dgD+uP-suma;
+  return {dgD,uP,dgZus,dgZdrow,uZus,uZdrow,pit,danina,suma,nettoY,nettoM:nettoY/12,stopa:(dgD+uDoch)?suma/(dgD+uDoch):null};
+}
+function renderJdgUop(){
+  const box=$("#jdgUopResults"); if(!box) return;
+  if(!box.dataset.wired){ box.dataset.wired="1"; ["#juP","#juK","#juZus","#juMg","#juKup"].forEach(id=>{const el=$(id);if(el)el.addEventListener("input",renderJdgUop);}); }
+  const f=calcJdgUop(kalkNum("#juP"),kalkNum("#juK"),kalkNum("#juZus"),kalkNum("#juMg"),kalkNum("#juKup"));
+  const rows=[["PIT (łącznie, skala)",f.pit],["Zdrowotna z DG",f.dgZdrow],["Zdrowotna z UoP",f.uZdrow],["ZUS z DG",f.dgZus],["ZUS z UoP",f.uZus]];
+  if(f.danina>0) rows.push(["Danina solidarn.",f.danina]);
+  box.innerHTML=`<div class="kc-dochod">Dochód z DG: <b>${plPLN(f.dgD)}</b> + przychód z UoP: <b>${plPLN(f.uP)}</b></div>
+    <div class="kgrid"><div class="kc"><div class="kc-h">JDG (skala) + umowa o pracę</div>${kalkRows(rows)}
+      <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+      <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+      <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.nettoY)}</b></div>
+      <div class="kr"><span>Zostaje (mies.)</span><b>${plPLN(f.nettoM)}</b></div>
+    </div></div>`;
+}
+
+// --- Spolka osobowa nie-CIT: udzial wspolnika rozliczany jak JDG ---
+function renderOsobowa(){
+  const box=$("#osResults"); if(!box) return;
+  if(!box.dataset.wired){ box.dataset.wired="1";
+    ["#osP","#osK","#osShare"].forEach(id=>{const el=$(id);if(el)el.addEventListener("input",renderOsobowa);});
+    ["#osZus","#osR","#osChor"].forEach(id=>{const el=$(id);if(el)el.addEventListener("change",renderOsobowa);});
+  }
+  const totP=kalkNum("#osP"), totK=kalkNum("#osK");
+  let share=kalkNum("#osShare")/100; if(!(share>0)) share=0; if(share>1) share=1;
+  const pP=totP*share, pK=totK*share;
+  const r=parseFloat(($("#osR")||{}).value||"0.085");
+  const chor=!!(($("#osChor")||{}).checked);
+  const scheme=(($("#osZus")||{}).value)||"pelny";
+  const ZUS=zusForScheme(scheme,pP,pK,chor);
+  const res=calcForms(pP,pK,ZUS,r);
+  const forms=[["Liniowy 19%",res.lin],["Ryczałt "+plPct(r),res.rycz],["Skala podatkowa",res.sk]];
+  let best=null; forms.forEach(([_,f])=>{ if(f&&(best===null||f.suma<best)) best=f.suma; });
+  box.innerHTML=`<div class="kc-dochod">Twój udział: <b>${plPct(share)}</b> → Twój przychód: <b>${plPLN(pP)}</b> · Twój dochód: <b>${plPLN(res.D)}</b> · ZUS <b>${esc(ZUS_LABEL[scheme])}</b>${chor?" + chorobowe":""}: ${plPLN(ZUS)}</div>
+    <div class="kgrid">${forms.map(f=>jdgCard(f[0],f[1],best)).join("")}</div>`;
+}
+
+// --- Spolka komandytowa (komandytariusz vs komplementariusz) ---
+function calcKomandyt(P,K,n,maly){
+  const doch=Math.max(P-K,0);
+  const cit=Math.max(doch*(maly?0.09:0.19),0);
+  const zus=21459.48*n, zdrow=830.58*12*n;
+  const wyplata=Math.max(doch-cit,0);
+  const pitTrad=wyplata*0.19;
+  const pitRosz=Math.max(wyplata*0.19-cit,0);
+  const mk=(pit)=>{ const suma=cit+zus+zdrow+pit; return {cit,zus,zdrow,pit,suma,stopa:doch?suma/doch:null,netto:doch-suma}; };
+  return {doch,wyplata, trad:mk(pitTrad), rosz:mk(pitRosz)};
+}
+function renderKomandyt(){
+  const box=$("#komResults"); if(!box) return;
+  if(!box.dataset.wired){ box.dataset.wired="1";
+    ["#komP","#komK","#komN"].forEach(id=>{const el=$(id);if(el)el.addEventListener("input",renderKomandyt);});
+    const m=$("#komMaly"); if(m) m.addEventListener("change",renderKomandyt);
+  }
+  const P=kalkNum("#komP"),K=kalkNum("#komK"); let n=Math.round(kalkNum("#komN"))||1; if(n<1)n=1;
+  const maly=!!(($("#komMaly")||{}).checked);
+  const res=calcKomandyt(P,K,n,maly);
+  let best=Math.min(res.trad.suma,res.rosz.suma);
+  const card=(name,sub,f)=>{
+    const isBest=Math.abs(f.suma-best)<0.005;
+    const rows=[["CIT spółki",f.cit],["PIT od wypłaty",f.pit],["ZUS wspólników",f.zus],["Zdrowotna wspólników",f.zdrow]];
+    return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">korzystniej</div>':''}
+      <div class="kc-h">${esc(name)}</div><div style="font-size:11px;color:var(--ink-faint);margin:-2px 0 8px;line-height:1.3">${esc(sub)}</div>${kalkRows(rows)}
+      <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+      <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+      <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.netto)}</b></div>
+    </div>`;
+  };
+  box.innerHTML=`<div class="kc-dochod">Dochód spółki: <b>${plPLN(res.doch)}</b> · po CIT do wypłaty: <b>${plPLN(res.wyplata)}</b> · ${n} wspóln.</div>
+    <div class="kgrid">${card("Komandytariusze (tradycyjna)","wspólnik = komandytariusz, bez odliczenia CIT",res.trad)}${card("Komplementariusze (roszada)","wspólnik = komplementariusz, odlicza CIT od PIT",res.rosz)}</div>`;
+}
+
+// --- Laczne rozliczenie skala (malzonkowie / samotny rodzic) ---
+let lacSingle=false;
+function calcLacznie(podA,podB,single){
+  const half = single ? podA/2 : (podA+podB)/2;
+  const joint = 2*skalaPIT(half);
+  const sep = single ? skalaPIT(podA) : (skalaPIT(podA)+skalaPIT(podB));
+  return {joint, sep, save:Math.max(sep-joint,0)};
+}
+function renderLacznie(){
+  const box=$("#lacResults"); if(!box) return;
+  if(!box.dataset.wired){ box.dataset.wired="1";
+    ["#lacA","#lacB"].forEach(id=>{const el=$(id);if(el)el.addEventListener("input",renderLacznie);});
+    document.querySelectorAll("#lacMode .srcbtn").forEach(b=>b.addEventListener("click",()=>{
+      lacSingle=(b.dataset.mode==="rodzic");
+      document.querySelectorAll("#lacMode .srcbtn").forEach(x=>x.classList.toggle("on",x===b));
+      const bw=$("#lacBWrap"); if(bw) bw.style.display=lacSingle?"none":"";
+      const lbl=$("#lacALbl"); if(lbl) lbl.textContent=lacSingle?"Dochód do opodatkowania — rodzic / rok":"Dochód do opodatkowania — małżonek A / rok";
+      renderLacznie();
+    }));
+  }
+  const podA=kalkNum("#lacA"), podB=kalkNum("#lacB");
+  const res=calcLacznie(podA,podB,lacSingle);
+  const hasGain=res.save>0.005;
+  box.innerHTML=`<div class="kgrid">
+    <div class="kc"><div class="kc-h">Rozliczenie osobne</div>
+      <div class="kr"><span>PIT (suma osobnych)</span><b>${plPLN(res.sep)}</b></div></div>
+    <div class="kc${hasGain?' kc-best':''}">${hasGain?'<div class="kc-badge">korzystniej</div>':''}<div class="kc-h">${lacSingle?"Rodzic z dzieckiem":"Wspólnie (małżonkowie)"}</div>
+      <div class="kr"><span>PIT przy wspólnym rozliczeniu</span><b>${plPLN(res.joint)}</b></div>
+      <div class="kr kr-net"><span>Oszczędność na PIT</span><b>${plPLN(res.save)}</b></div></div>
+  </div>${hasGain?"":`<div class="kc-note">Przy zbliżonych dochodach wspólne rozliczenie nie daje korzyści (oba progi i kwoty wolne i tak są wykorzystane).</div>`}`;
 }
 
 function render(){
@@ -2724,7 +2994,7 @@ function render(){
   else if(state.tab==="terminy") c=renderTerminy();
   else if(state.tab==="kursy") c=renderKursy();
   else if(state.tab==="stawki") c=renderStawki();
-  else if(state.tab==="kalk"){ renderKalk(); renderSpzoo(); c=0; }
+  else if(state.tab==="kalk"){ renderKalk(); renderEtat(); renderJdgUop(); renderOsobowa(); renderKomandyt(); renderSpzoo(); renderLacznie(); c=0; }
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
   else c=n;
@@ -2738,7 +3008,7 @@ const SUBTABS = {
   terminy: [["lista","Terminy","#terminyMain"], ["kalk","Kalkulator terminu","#termCalcWrap"]],
   kursy:   [["kursy","Kursy walut","#kursyRates"], ["kalk","Przelicznik walut","#kursyConv"]],
   stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT","#stawkiVat"]],
-  kalk:    [["jdg","JDG","#kalkJdg"], ["spzoo","Spółka z o.o.","#kalkSpzoo"]],
+  kalk:    [["jdg","JDG","#kalkJdg"], ["etat","Etat","#kalkEtat"], ["jdguop","JDG + etat","#kalkJdgUop"], ["osobowa","Spółka osobowa","#kalkOsobowa"], ["komandyt","Komandytowa","#kalkKomandyt"], ["spzoo","Spółka z o.o.","#kalkSpzoo"], ["lacznie","Łączne (skala)","#kalkLacznie"]],
 };
 function fillSubBars(){
   Object.keys(SUBTABS).forEach(tab=>{
@@ -2756,9 +3026,38 @@ function applySub(tab){
   cfg.forEach(([k,,view])=>{ const el=$(view); if(el) el.hidden=(k!==cur); });
   document.querySelectorAll(`[data-sub^="${tab}:"]`).forEach(b=>b.classList.toggle("on", b.dataset.sub===tab+":"+cur));
 }
+// --- sekcje: grupowanie zakladek-czlonkow (Narzedzia, Prawo) ---
+const SECTIONS = [
+  ["news",      "Wiadomości", ["news"]],
+  ["terminy",   "Terminy",    ["terminy"]],
+  ["narzedzia", "Narzędzia",  ["kursy","stawki","kalk"]],
+  ["prawo",     "Prawo",      ["legis","wyroki","kis"]],
+  ["moje",      "Moje",       ["moje"]],
+];
+const MEMBER_LABEL = {news:"Wiadomości", terminy:"Terminy", kursy:"Kursy", stawki:"Stawki", kalk:"Kalkulator", legis:"Ustawy", wyroki:"Wyroki", kis:"Interpretacje", moje:"Moje"};
+let lastMem = {narzedzia:"kursy", prawo:"legis"};
+function sectionOf(tab){ const s=SECTIONS.find(x=>x[2].includes(tab)); return s?s[0]:"news"; }
+function fillMemberBar(sec, activeTab){
+  const bar=$("#memberBar"); if(!bar) return;
+  const s=SECTIONS.find(x=>x[0]===sec);
+  if(!s || s[2].length<2){ bar.hidden=true; bar.innerHTML=""; return; }
+  bar.hidden=false;
+  bar.innerHTML=s[2].map(m=>`<button class="memtab${m===activeTab?' on':''}" data-mem="${m}">${esc(MEMBER_LABEL[m])}</button>`).join("");
+  bar.querySelectorAll("[data-mem]").forEach(btn=>btn.onclick=()=>switchTab(btn.dataset.mem));
+}
+function switchSection(sec){
+  const s=SECTIONS.find(x=>x[0]===sec); if(!s) return;
+  let target=s[2][0];
+  if(s[2].length>1 && lastMem[sec] && s[2].includes(lastMem[sec])) target=lastMem[sec];
+  switchTab(target);
+}
 function switchTab(t){
   state.tab=t;
-  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
+  const sec=sectionOf(t);
+  const s=SECTIONS.find(x=>x[0]===sec);
+  if(s && s[2].length>1) lastMem[sec]=t;
+  document.querySelectorAll("[data-section]").forEach(b=>b.classList.toggle("on", b.dataset.section===sec));
+  fillMemberBar(sec, t);
   $("#newsView").hidden  = t!=="news";
   $("#wyrokiView").hidden= t!=="wyroki";
   $("#kisView").hidden   = t!=="kis";
@@ -2800,7 +3099,7 @@ function switchTab(t){
   ["#wyrFrom","#wyrTo","#wyrType","#wyrSort"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",()=>{ if(wyrCtx && state.wyrokiSrc!=="cbosa") searchWyroki(); }); });
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
-  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.querySelectorAll("[data-section]").forEach(b=>b.onclick=()=>switchSection(b.dataset.section));
   fillSubBars();
   // delegacja: „+" dodaj / „✓" usuń (na kartach) oraz usuń w „Moje"
   document.body.addEventListener("click", e=>{
