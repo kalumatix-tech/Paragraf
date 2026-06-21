@@ -1032,17 +1032,46 @@ TEMPLATE = r'''<!DOCTYPE html>
   .conv-swap{border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:9px;
     width:38px;height:38px;font-size:16px;cursor:pointer}
   .conv-swap:hover{background:rgba(0,0,0,.04)}
-  /* tabela VAT */
-  .vt-group{margin:14px 0}
-  .vt-from{font-size:13px;color:var(--ink-soft);margin-bottom:6px}
-  .vt-from b{color:var(--ink)}
-  table.vt{width:100%;border-collapse:collapse;font-size:13px}
-  table.vt th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);
-    font-weight:700;padding:5px 10px;border-bottom:1px solid var(--line)}
-  table.vt td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  table.vt .vt-rate{font-family:var(--serif);font-weight:600;color:var(--ink);white-space:nowrap}
-  table.vt .vt-note{font-family:var(--sans);font-size:11px;font-weight:400;color:var(--ink-faint);white-space:normal}
-  table.vt tr:last-child td{border-bottom:none}
+  /* VAT - weryfikator i panstwa (czyste, oddzielone karty) */
+  .vat-tool{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:16px 16px 14px;margin:0 0 16px;box-shadow:0 1px 3px rgba(40,30,20,.05)}
+  .vat-th{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--accent);margin-bottom:3px}
+  .vat-sub{font-size:12px;color:var(--ink-faint);line-height:1.5;margin:0 0 11px}
+  .vat-input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);
+    border-radius:9px;font-size:14px;font-family:var(--sans);background:#fff;color:var(--ink)}
+  select.vat-input{cursor:pointer;-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 8l3-3.5' stroke='%23999' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+  .vat-input:focus{outline:none;border-color:var(--accent)}
+  .vat-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}
+  .vat-chip{font-family:var(--sans);font-size:11.5px;color:var(--ink-soft);background:var(--paper,#f5f0e8);
+    border:1px solid var(--line);border-radius:20px;padding:4px 11px;cursor:pointer;transition:all .12s}
+  .vat-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .vat-res{display:flex;align-items:flex-start;gap:13px;margin-top:13px;padding:13px 14px;
+    background:var(--paper,#faf7f1);border:1px solid var(--line);border-radius:10px}
+  .vat-badge{flex:none;min-width:54px;text-align:center;color:#fff;font-family:var(--serif);
+    font-weight:700;font-size:19px;border-radius:9px;padding:9px 10px;line-height:1}
+  .vat-resmain{flex:1;min-width:0}
+  .vat-rescat{font-weight:700;font-size:13.5px;color:var(--ink);margin-bottom:3px;text-transform:capitalize}
+  .vat-resnote{font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+  .vat-caveat{font-size:11.5px;color:var(--ink-faint);line-height:1.5;margin:12px 0 0;
+    padding-top:11px;border-top:1px dashed var(--line)}
+  .vat-country{margin-top:13px}
+  .vat-cstd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:12px;
+    border-bottom:1px solid var(--line)}
+  .vat-cstd-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);font-weight:700}
+  .vat-cstd-val{font-family:var(--serif);font-weight:700;font-size:30px;line-height:1}
+  .vat-cstd-tax{font-size:11px;color:var(--ink-faint);background:var(--paper,#f5f0e8);
+    border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .vat-cred{padding-top:12px}
+  .vat-cred-lbl{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--ink-faint);font-weight:700;margin-bottom:7px}
+  .vat-cred-row{display:flex;flex-wrap:wrap;gap:7px}
+  .vat-rchip{font-family:var(--serif);font-weight:600;font-size:14px;color:#2a7a4a;
+    background:rgba(42,122,74,.1);border:1px solid rgba(42,122,74,.25);border-radius:7px;padding:4px 11px}
+  .vat-rnone{font-size:12.5px;color:var(--ink-faint);font-style:italic}
+  .vat-cnote{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:12px;
+    padding:9px 11px;background:rgba(176,124,42,.08);border-left:3px solid var(--accent);border-radius:0 7px 7px 0}
   /* kalkulator */
   .kalk-inputs{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
   .kin{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
@@ -1284,6 +1313,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <div id="stawkiSciaga"><div class="controls"><div id="sciagawkaBox"></div><div id="sciagaCustom"></div></div></div>
       <div id="stawkiZus"><div class="controls"><div id="zusBox"></div></div></div>
       <div id="stawkiVat"><div class="controls"><div id="vatBox"></div></div></div>
+      <!-- vatBox wypelniany przez renderVAT: weryfikator stawki PL + stawki wg panstwa -->
     </section>
 
     <section id="kalkView" hidden>
@@ -2222,37 +2252,262 @@ function renderKursy(){
 }
 
 // ---- STAWKI: sciagawka + tabela VAT (sprzedaz transgraniczna) ----
-const VAT_TABLE=[
-  {from:"Polska", rows:[
-    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"23%", note:"książki 5%"},
-    {to:"Firmy spoza UE (eksport)", rate:"0%"},
-    {to:"Firmy z UE (WDT)", rate:"0%"},
-    {to:"Osoby fizyczne spoza UE", rate:"0%"},
-    {to:"Osoby fizyczne z UE (poza Polską)", rate:"23% lub stawka kraju odbiorcy", note:"zależnie od progu OSS"},
-  ]},
-  {from:"Szwajcaria", rows:[
-    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"8,1%"},
-    {to:"Firmy spoza UE", rate:"0%"},
-    {to:"Firmy z UE", rate:"0%"},
-    {to:"Osoby fizyczne z UE i spoza UE", rate:"0%"},
-  ]},
-  {from:"Wielka Brytania (UK)", rows:[
-    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"20,0%"},
-    {to:"Firmy spoza UE", rate:"0%"},
-    {to:"Firmy z UE", rate:"0%"},
-    {to:"Osoby fizyczne z UE i spoza UE", rate:"0%"},
-  ]},
+// === VAT/GST: stawki standardowe i obnizone wg panstwa (caly swiat, ~135 panstw) ===
+// Stan: styczen 2026 (zrodla: eClear, VATupdate/PwC). std=null => brak VAT (inny podatek).
+const VAT_COUNTRIES=[
+  // --- Europa ---
+  {name:"Albania", flag:"🇦🇱", region:"Europa", std:20, red:[10,6]},
+  {name:"Andora", flag:"🇦🇩", region:"Europa", std:4.5, red:[2.5,1], note:"Najniższa stawka standardowa w Europie."},
+  {name:"Austria", flag:"🇦🇹", region:"Europa", tax:"USt", std:20, red:[13,10]},
+  {name:"Belgia", flag:"🇧🇪", region:"Europa", tax:"TVA/BTW", std:21, red:[12,6]},
+  {name:"Białoruś", flag:"🇧🇾", region:"Europa", std:20, red:[10]},
+  {name:"Bośnia i Hercegowina", flag:"🇧🇦", region:"Europa", std:17, red:[]},
+  {name:"Bułgaria", flag:"🇧🇬", region:"Europa", tax:"DDS", std:20, red:[9]},
+  {name:"Chorwacja", flag:"🇭🇷", region:"Europa", tax:"PDV", std:25, red:[13,5]},
+  {name:"Cypr", flag:"🇨🇾", region:"Europa", tax:"FPA", std:19, red:[9,5,3]},
+  {name:"Czarnogóra", flag:"🇲🇪", region:"Europa", std:21, red:[15,7]},
+  {name:"Czechy", flag:"🇨🇿", region:"Europa", tax:"DPH", std:21, red:[12]},
+  {name:"Dania", flag:"🇩🇰", region:"Europa", tax:"MOMS", std:25, red:[], note:"Jedna stawka — bez ogólnych stawek obniżonych."},
+  {name:"Estonia", flag:"🇪🇪", region:"Europa", tax:"KMR", std:24, red:[13,9], note:"Standardowa podniesiona do 24% (lipiec 2025)."},
+  {name:"Finlandia", flag:"🇫🇮", region:"Europa", tax:"ALV", std:25.5, red:[13.5,10], note:"Stawka obniżona obcięta do 13,5% (2026)."},
+  {name:"Francja", flag:"🇫🇷", region:"Europa", tax:"TVA", std:20, red:[10,5.5,2.1]},
+  {name:"Grecja", flag:"🇬🇷", region:"Europa", tax:"FPA", std:24, red:[13,6]},
+  {name:"Hiszpania", flag:"🇪🇸", region:"Europa", tax:"IVA", std:21, red:[10,4]},
+  {name:"Holandia", flag:"🇳🇱", region:"Europa", tax:"BTW", std:21, red:[9], note:"Noclegi przeniesione na 21% (2026)."},
+  {name:"Irlandia", flag:"🇮🇪", region:"Europa", tax:"VAT", std:23, red:[13.5,9,4.8]},
+  {name:"Islandia", flag:"🇮🇸", region:"Europa", tax:"VSK", std:24, red:[11]},
+  {name:"Liechtenstein", flag:"🇱🇮", region:"Europa", tax:"MWST", std:8.1, red:[3.8,2.6]},
+  {name:"Litwa", flag:"🇱🇹", region:"Europa", tax:"PVM", std:21, red:[12,5]},
+  {name:"Luksemburg", flag:"🇱🇺", region:"Europa", tax:"TVA", std:17, red:[14,8,3], note:"Najniższa stawka standardowa w UE."},
+  {name:"Łotwa", flag:"🇱🇻", region:"Europa", tax:"PVN", std:21, red:[12,5]},
+  {name:"Macedonia Północna", flag:"🇲🇰", region:"Europa", std:18, red:[10,5]},
+  {name:"Malta", flag:"🇲🇹", region:"Europa", tax:"VAT", std:18, red:[12,7,5]},
+  {name:"Mołdawia", flag:"🇲🇩", region:"Europa", std:20, red:[12,8]},
+  {name:"Monako", flag:"🇲🇨", region:"Europa", tax:"TVA", std:20, red:[10,5.5,2.1], note:"Stosuje stawki francuskie."},
+  {name:"Niemcy", flag:"🇩🇪", region:"Europa", tax:"USt", std:19, red:[7], note:"Posiłki w gastronomii na 7% od 2026."},
+  {name:"Norwegia", flag:"🇳🇴", region:"Europa", tax:"MVA", std:25, red:[15,12]},
+  {name:"Polska", flag:"🇵🇱", region:"Europa", tax:"VAT", std:23, red:[8,5]},
+  {name:"Portugalia", flag:"🇵🇹", region:"Europa", tax:"IVA", std:23, red:[13,6], note:"Inne stawki na Azorach i Maderze."},
+  {name:"Rumunia", flag:"🇷🇴", region:"Europa", tax:"TVA", std:21, red:[11], note:"Standardowa 21% (sierpień 2025), jedna obniżona 11%."},
+  {name:"Serbia", flag:"🇷🇸", region:"Europa", tax:"PDV", std:20, red:[10]},
+  {name:"Słowacja", flag:"🇸🇰", region:"Europa", tax:"DPH", std:23, red:[19,5]},
+  {name:"Słowenia", flag:"🇸🇮", region:"Europa", tax:"DDV", std:22, red:[9.5,5]},
+  {name:"Szwajcaria", flag:"🇨🇭", region:"Europa", tax:"MWST", std:8.1, red:[3.8,2.6], note:"Jedyne państwo w Europie poniżej minimum UE (15%)."},
+  {name:"Szwecja", flag:"🇸🇪", region:"Europa", tax:"MOMS", std:25, red:[12,6]},
+  {name:"Ukraina", flag:"🇺🇦", region:"Europa", tax:"PDV", std:20, red:[14,7]},
+  {name:"Watykan", flag:"🇻🇦", region:"Europa", std:null, note:"Brak VAT."},
+  {name:"Węgry", flag:"🇭🇺", region:"Europa", tax:"AFA", std:27, red:[18,5], note:"Najwyższa stawka standardowa w UE i na świecie."},
+  {name:"Wielka Brytania", flag:"🇬🇧", region:"Europa", tax:"VAT", std:20, red:[5]},
+  {name:"Włochy", flag:"🇮🇹", region:"Europa", tax:"IVA", std:22, red:[10,5,4]},
+  // --- Bliski Wschód ---
+  {name:"Arabia Saudyjska", flag:"🇸🇦", region:"Bliski Wschód", std:15, red:[], note:"Podniesiona z 5% do 15% (2020)."},
+  {name:"Bahrajn", flag:"🇧🇭", region:"Bliski Wschód", std:10, red:[], note:"Podwojona z 5% do 10% (2022)."},
+  {name:"Emiraty Arabskie (ZEA)", flag:"🇦🇪", region:"Bliski Wschód", std:5, red:[]},
+  {name:"Iran", flag:"🇮🇷", region:"Bliski Wschód", std:9, red:[]},
+  {name:"Izrael", flag:"🇮🇱", region:"Bliski Wschód", std:18, red:[]},
+  {name:"Jemen", flag:"🇾🇪", region:"Bliski Wschód", std:5, red:[]},
+  {name:"Jordania", flag:"🇯🇴", region:"Bliski Wschód", std:16, red:[]},
+  {name:"Katar", flag:"🇶🇦", region:"Bliski Wschód", std:null, note:"Brak VAT (planowany)."},
+  {name:"Kuwejt", flag:"🇰🇼", region:"Bliski Wschód", std:null, note:"Brak VAT (planowany)."},
+  {name:"Liban", flag:"🇱🇧", region:"Bliski Wschód", std:11, red:[]},
+  {name:"Oman", flag:"🇴🇲", region:"Bliski Wschód", std:5, red:[]},
+  {name:"Syria", flag:"🇸🇾", region:"Bliski Wschód", std:null, note:"Brak VAT."},
+  {name:"Turcja", flag:"🇹🇷", region:"Bliski Wschód", tax:"KDV", std:20, red:[10,1]},
+  // --- Azja i Oceania ---
+  {name:"Armenia", flag:"🇦🇲", region:"Azja i Oceania", std:20, red:[]},
+  {name:"Australia", flag:"🇦🇺", region:"Azja i Oceania", tax:"GST", std:10, red:[], note:"GST, bez stawek obniżonych (podstawowa żywność 0%)."},
+  {name:"Azerbejdżan", flag:"🇦🇿", region:"Azja i Oceania", std:18, red:[]},
+  {name:"Bangladesz", flag:"🇧🇩", region:"Azja i Oceania", std:15, red:[10,7.5,5]},
+  {name:"Bhutan", flag:"🇧🇹", region:"Azja i Oceania", std:7, red:[], note:"GST wprowadzony w 2025/2026."},
+  {name:"Chiny", flag:"🇨🇳", region:"Azja i Oceania", tax:"VAT", std:13, red:[9,6], note:"Mali podatnicy 3%."},
+  {name:"Fidżi", flag:"🇫🇯", region:"Azja i Oceania", std:9, red:[]},
+  {name:"Filipiny", flag:"🇵🇭", region:"Azja i Oceania", std:12, red:[]},
+  {name:"Gruzja", flag:"🇬🇪", region:"Azja i Oceania", std:18, red:[]},
+  {name:"Hongkong", flag:"🇭🇰", region:"Azja i Oceania", std:null, note:"Brak VAT/GST."},
+  {name:"Indie", flag:"🇮🇳", region:"Azja i Oceania", tax:"GST", std:18, red:[12,5,3], note:"GST, główne progi 5/12/18/28%."},
+  {name:"Indonezja", flag:"🇮🇩", region:"Azja i Oceania", std:11, red:[]},
+  {name:"Japonia", flag:"🇯🇵", region:"Azja i Oceania", tax:"JCT", std:10, red:[8], note:"8% m.in. na żywność i prasę."},
+  {name:"Kambodża", flag:"🇰🇭", region:"Azja i Oceania", std:10, red:[]},
+  {name:"Kazachstan", flag:"🇰🇿", region:"Azja i Oceania", std:16, red:[], note:"Podniesiona do 16% (2026)."},
+  {name:"Korea Południowa", flag:"🇰🇷", region:"Azja i Oceania", std:10, red:[]},
+  {name:"Laos", flag:"🇱🇦", region:"Azja i Oceania", std:10, red:[]},
+  {name:"Malezja", flag:"🇲🇾", region:"Azja i Oceania", std:null, note:"Brak VAT — podatek SST (sprzedaż/usługi)."},
+  {name:"Mongolia", flag:"🇲🇳", region:"Azja i Oceania", std:10, red:[]},
+  {name:"Nepal", flag:"🇳🇵", region:"Azja i Oceania", std:13, red:[]},
+  {name:"Nowa Zelandia", flag:"🇳🇿", region:"Azja i Oceania", tax:"GST", std:15, red:[]},
+  {name:"Pakistan", flag:"🇵🇰", region:"Azja i Oceania", std:null, note:"Brak jednolitego VAT — sales tax 18% na towary."},
+  {name:"Papua-Nowa Gwinea", flag:"🇵🇬", region:"Azja i Oceania", std:10, red:[]},
+  {name:"Rosja", flag:"🇷🇺", region:"Azja i Oceania", std:22, red:[10], note:"Podniesiona do 22% (2026)."},
+  {name:"Singapur", flag:"🇸🇬", region:"Azja i Oceania", tax:"GST", std:9, red:[], note:"Podniesiona z 7% do 9%."},
+  {name:"Sri Lanka", flag:"🇱🇰", region:"Azja i Oceania", std:18, red:[]},
+  {name:"Tadżykistan", flag:"🇹🇯", region:"Azja i Oceania", std:14, red:[10,7,5]},
+  {name:"Tajlandia", flag:"🇹🇭", region:"Azja i Oceania", std:7, red:[], note:"Ustawowo 10%, czasowo 7%."},
+  {name:"Tajwan", flag:"🇹🇼", region:"Azja i Oceania", std:5, red:[]},
+  {name:"Uzbekistan", flag:"🇺🇿", region:"Azja i Oceania", std:12, red:[]},
+  {name:"Vanuatu", flag:"🇻🇺", region:"Azja i Oceania", std:15, red:[]},
+  {name:"Wietnam", flag:"🇻🇳", region:"Azja i Oceania", std:10, red:[5], note:"Czasowo obniżona do 8% (przedłużona na 2026)."},
+  // --- Afryka ---
+  {name:"Algieria", flag:"🇩🇿", region:"Afryka", std:19, red:[9]},
+  {name:"Angola", flag:"🇦🇴", region:"Afryka", std:14, red:[]},
+  {name:"Botswana", flag:"🇧🇼", region:"Afryka", std:14, red:[]},
+  {name:"Egipt", flag:"🇪🇬", region:"Afryka", std:14, red:[5]},
+  {name:"Etiopia", flag:"🇪🇹", region:"Afryka", std:15, red:[]},
+  {name:"Gabon", flag:"🇬🇦", region:"Afryka", std:18, red:[]},
+  {name:"Ghana", flag:"🇬🇭", region:"Afryka", std:15, red:[], note:"Plus dodatkowe opłaty, efektywnie ~20%."},
+  {name:"Kamerun", flag:"🇨🇲", region:"Afryka", std:19.25, red:[]},
+  {name:"Kenia", flag:"🇰🇪", region:"Afryka", std:16, red:[]},
+  {name:"Maroko", flag:"🇲🇦", region:"Afryka", std:20, red:[14,10,7]},
+  {name:"Mauritius", flag:"🇲🇺", region:"Afryka", std:15, red:[]},
+  {name:"Mozambik", flag:"🇲🇿", region:"Afryka", std:16, red:[]},
+  {name:"Namibia", flag:"🇳🇦", region:"Afryka", std:15, red:[]},
+  {name:"Nigeria", flag:"🇳🇬", region:"Afryka", std:7.5, red:[]},
+  {name:"RPA", flag:"🇿🇦", region:"Afryka", std:15, red:[]},
+  {name:"Rwanda", flag:"🇷🇼", region:"Afryka", std:18, red:[]},
+  {name:"Senegal", flag:"🇸🇳", region:"Afryka", std:18, red:[]},
+  {name:"Tanzania", flag:"🇹🇿", region:"Afryka", std:18, red:[]},
+  {name:"Tunezja", flag:"🇹🇳", region:"Afryka", std:19, red:[13,7]},
+  {name:"Uganda", flag:"🇺🇬", region:"Afryka", std:18, red:[]},
+  {name:"Wybrzeże Kości Słoniowej", flag:"🇨🇮", region:"Afryka", std:18, red:[]},
+  {name:"Zambia", flag:"🇿🇲", region:"Afryka", std:16, red:[]},
+  {name:"Zimbabwe", flag:"🇿🇼", region:"Afryka", std:15, red:[], note:"Podniesiona do 15% (2026)."},
+  // --- Ameryki ---
+  {name:"Argentyna", flag:"🇦🇷", region:"Ameryki", std:21, red:[10.5]},
+  {name:"Barbados", flag:"🇧🇧", region:"Ameryki", std:17.5, red:[10]},
+  {name:"Belize", flag:"🇧🇿", region:"Ameryki", std:12.5, red:[]},
+  {name:"Boliwia", flag:"🇧🇴", region:"Ameryki", std:13, red:[]},
+  {name:"Brazylia", flag:"🇧🇷", region:"Ameryki", std:18, red:[], note:"ICMS stanowy, zwykle 17-20%; złożony system wielopodatkowy."},
+  {name:"Chile", flag:"🇨🇱", region:"Ameryki", std:19, red:[]},
+  {name:"Dominikana", flag:"🇩🇴", region:"Ameryki", std:18, red:[]},
+  {name:"Ekwador", flag:"🇪🇨", region:"Ameryki", std:15, red:[]},
+  {name:"Gwatemala", flag:"🇬🇹", region:"Ameryki", std:12, red:[]},
+  {name:"Honduras", flag:"🇭🇳", region:"Ameryki", std:15, red:[]},
+  {name:"Jamajka", flag:"🇯🇲", region:"Ameryki", std:15, red:[]},
+  {name:"Kanada", flag:"🇨🇦", region:"Ameryki", tax:"GST", std:5, red:[], note:"GST 5% + podatki prowincji (HST/PST), łącznie zwykle 12-15%."},
+  {name:"Kolumbia", flag:"🇨🇴", region:"Ameryki", std:19, red:[5]},
+  {name:"Kostaryka", flag:"🇨🇷", region:"Ameryki", std:13, red:[4,2,1]},
+  {name:"Meksyk", flag:"🇲🇽", region:"Ameryki", std:16, red:[], note:"8% w strefach przygranicznych."},
+  {name:"Nikaragua", flag:"🇳🇮", region:"Ameryki", std:15, red:[]},
+  {name:"Panama", flag:"🇵🇦", region:"Ameryki", std:7, red:[], note:"Najniższa stawka w obu Amerykach."},
+  {name:"Paragwaj", flag:"🇵🇾", region:"Ameryki", std:10, red:[5]},
+  {name:"Peru", flag:"🇵🇪", region:"Ameryki", std:18, red:[]},
+  {name:"Salwador", flag:"🇸🇻", region:"Ameryki", std:13, red:[]},
+  {name:"Stany Zjednoczone (USA)", flag:"🇺🇸", region:"Ameryki", tax:"sales tax", std:null, note:"Brak VAT — podatek od sprzedaży (sales tax) różny stanowo, średnio ~7,5%."},
+  {name:"Trynidad i Tobago", flag:"🇹🇹", region:"Ameryki", std:12.5, red:[]},
+  {name:"Urugwaj", flag:"🇺🇾", region:"Ameryki", std:22, red:[10]},
+  {name:"Wenezuela", flag:"🇻🇪", region:"Ameryki", std:16, red:[8]},
 ];
+const VAT_REGIONS=["Europa","Bliski Wschód","Azja i Oceania","Afryka","Ameryki"];
+const VAT_COL={"23%":"#8a2e2a","8%":"#b07c2a","5%":"#2a7a4a","0%":"#2a6a7a","zw":"#6b4a8a"};
+
+// === Weryfikator stawki VAT (Polska) — heurystyka slowo -> stawka ===
+const VAT_RULES=[
+  // 23% wyjatki bijace nizsze stawki
+  {rate:"23%", cat:"napoje", kw:["kawa","herbata","napoj","napoje","sok","soki","energetyk","cola","lemoniad","slodzon"], note:"Napoje (także w gastronomii) są zwykle 23%, mimo że samo jedzenie w lokalu bywa 8%."},
+  {rate:"23%", cat:"alkohol", kw:["alkohol","piwo","wino","wodka","whisky","drink","szampan","cydr","nalewk","trunek"], note:"Napoje alkoholowe — zawsze 23%, także podawane w lokalu."},
+  {rate:"23%", cat:"wyroby tytoniowe", kw:["papieros","tyton","tytoniow","cygar","nikotyn","podgrzewacz"], note:"Wyroby tytoniowe i nikotynowe — 23%."},
+  {rate:"23%", cat:"produkt luksusowy", kw:["lod","kawior","homar","ostryg","skorupiak"], note:"Lody oraz wybrane produkty luksusowe — 23% (mimo że to żywność)."},
+  // 0%
+  {rate:"0%", cat:"eksport / WDT", kw:["eksport","wdt","wewnatrzwspolnotow","transport miedzynarodow"], note:"0% dotyczy eksportu poza UE, WDT (z ważnym VAT-UE) i transportu międzynarodowego — pod warunkami."},
+  // zwolnienie
+  {rate:"zw", cat:"usługi medyczne", kw:["lekarz","medyczn","lecz","zdrowotn","przychodni","stomatolog","dentyst","fizjoterap","psycholog","psychiatr"], note:"Zwolnione, gdy to profilaktyka/diagnoza/leczenie przez uprawniony podmiot. Medycyna estetyczna i usługi „techniczne” bywają 23%."},
+  {rate:"zw", cat:"edukacja", kw:["edukac","nauczani","szkolen","korepetycj","ksztalcen","przedszkol","zlobek"], note:"Usługi edukacyjne/nauczania zwykle zwolnione. Część szkoleń komercyjnych bywa 23%."},
+  {rate:"zw", cat:"finanse i ubezpieczenia", kw:["ubezpiecz","kredyt","pozyczk","finansow","bankow"], note:"Usługi finansowe i ubezpieczeniowe — zwolnione z VAT."},
+  {rate:"zw", cat:"najem mieszkaniowy", kw:["najem mieszkan","wynajem mieszkan","najem lokalu mieszkaln"], note:"Najem nieruchomości mieszkalnej na cele mieszkaniowe — zwolniony. Najem użytkowy = 23%, krótkoterminowy/turystyczny = 8%."},
+  // 5%
+  {rate:"5%", cat:"żywność podstawowa", kw:["chleb","pieczyw","bulk","mleko","nabial","jogurt","twarog","serek","maslo","mieso","drob","kurczak","wolowin","wieprzow","ryb","jaja","jajk","warzyw","owoc","maka","kasz","platki","zboz","tluszcz","miod"], note:"Podstawowe, nieprzetworzone produkty spożywcze — 5%. Przetworzone bywają 8%, a luksusowe/alkohol 23%."},
+  {rate:"5%", cat:"książki i prasa lokalna", kw:["ksiazk","ebook","audiobook","czasopismo regionaln","prasa lokaln","gazeta lokaln"], note:"Książki (papierowe i elektroniczne), audiobooki oraz prasa regionalna/lokalna i e-prasa — 5%."},
+  {rate:"5%", cat:"artykuły dziecięce i higieniczne", kw:["pieluch","pielusz","smoczek","fotelik","niemowl","podpask","tampon","higienicz","menstruac"], note:"Pieluchy, smoczki, foteliki dziecięce, artykuły higieniczne, żywność dla niemowląt — 5%."},
+  // 8%
+  {rate:"8%", cat:"gastronomia", kw:["restauracj","gastronom","catering","posilek","obiad","kawiarni","pizzeri","jadlodajni"], note:"Usługi gastronomiczne — 8%. Ale napoje (kawa, soki) i alkohol w rachunku — 23%."},
+  {rate:"8%", cat:"hotele i noclegi", kw:["hotel","nocleg","pensjonat","hostel","zakwaterowan","apartament"], note:"Usługi hotelarskie i noclegowe — 8%."},
+  {rate:"8%", cat:"transport pasażerski", kw:["transport osob","przewoz osob","transport pasazer","bilet","taksowk","komunikacj"], note:"Przewóz osób — 8%. Taksówki na ryczałcie mają szczególną stawkę 4%."},
+  {rate:"8%", cat:"usługi fryzjerskie i kosmetyczne", kw:["fryzjer","manicure","pedicure","paznokc","kosmetyczn","depilac"], note:"Usługi fryzjerskie i kosmetyczne (PKWiU 96.02) — 8% od kwietnia 2024. Same kosmetyki jako towar — 23%."},
+  {rate:"8%", cat:"leki i wyroby medyczne", kw:["leki","lekarstw","lecznicz","farmaceut","wyrob medyczn","wyroby medyczn","sprzet medyczn","odkaza"], note:"Produkty lecznicze i wyroby medyczne z wykazu — 8%."},
+  {rate:"8%", cat:"budownictwo mieszkaniowe", kw:["budownictwo mieszkan","remont mieszkan","budowa domu","mieszkani","termomoderniz","modernizacja budynk"], note:"Budowa/remont w społecznym programie mieszkaniowym (mieszkania do 150 m², domy do 300 m²) — 8%. Poza nim 23%."},
+  {rate:"8%", cat:"kultura, sport, rekreacja", kw:["kino","teatr","muzeum","koncert","basen","silown","sport","rekreac","wystaw"], note:"Wstęp na wydarzenia kultury, sportu i rekreacji — 8%."},
+  {rate:"8%", cat:"woda, ścieki, odpady", kw:["woda","wodociag","uzdatnian","sciek","kanalizac","smieci","odpad"], note:"Dostawa wody, odprowadzanie ścieków, wywóz odpadów — 8%."},
+  {rate:"8%", cat:"rolnictwo i ogród", kw:["nawoz","rolnicz","ogrodnicz","sadzonk","kwiat","roslin"], note:"Towary do produkcji rolnej, nawozy, rośliny i kwiaty cięte — 8%."},
+  {rate:"8%", cat:"prasa", kw:["prasa","gazeta","czasopismo","dziennik","tygodnik","miesiecznik"], note:"Wydawnictwa prasowe — zwykle 8% (prasa regionalna/lokalna i e-prasa — 5%)."},
+  // 23% jawne
+  {rate:"23%", cat:"usługi profesjonalne", kw:["ksiegow","rachunkow","prawn","adwokat","radca","doradz","konsulting","consulting","audyt"], note:"Usługi księgowe, prawne i doradcze — 23% bez wyjątków."},
+  {rate:"23%", cat:"IT i marketing", kw:["informatyc","programowani","oprogramowani","software","aplikacj","marketing","reklam"], note:"Usługi IT, programistyczne i marketingowe — 23%."},
+  {rate:"23%", cat:"tłumaczenia", kw:["tlumacz","translacj"], note:"Tłumaczenia — zwykle 23%. Wyjątek: nauczanie języków lub zwolnienie podmiotowe (limit 240 000 zł)."},
+  {rate:"23%", cat:"magazynowanie", kw:["magazynowani","skladowani"], note:"Usługi magazynowania i składowania — 23%."},
+  {rate:"23%", cat:"odzież i obuwie", kw:["odziez","ubran","obuwie","buty","kurtk","spodni","sukienk"], note:"Odzież i obuwie — 23%."},
+  {rate:"23%", cat:"elektronika", kw:["elektronik","komputer","laptop","telefon","smartfon","monitor","konsola"], note:"Elektronika i sprzęt RTV/AGD — 23%."},
+  {rate:"23%", cat:"motoryzacja", kw:["samochod","auto","pojazd","paliwo","benzyn","opony"], note:"Samochody, paliwo i części — 23%."},
+  {rate:"23%", cat:"meble i wyposażenie", kw:["meble","mebel","sofa","lozko","szaf"], note:"Meble i wyposażenie wnętrz — 23%."},
+  {rate:"23%", cat:"kosmetyki (towar)", kw:["kosmetyk","perfum","szampon","dezodorant","makijaz"], note:"Kosmetyki jako produkty — 23% (ale usługi kosmetyczne i fryzjerskie — 8%)."},
+];
+function vatStrip(s){ return String(s).toLowerCase()
+  .replace(/[ąàáâ]/g,"a").replace(/[ćč]/g,"c").replace(/[ęèéê]/g,"e").replace(/ł/g,"l")
+  .replace(/[ńň]/g,"n").replace(/[óòôö]/g,"o").replace(/[śš]/g,"s").replace(/[źżž]/g,"z").replace(/[üû]/g,"u"); }
+function vatVerify(q){
+  const full=vatStrip(q);
+  const toks=full.split(/[^a-z0-9]+/).filter(Boolean);
+  for(const r of VAT_RULES){
+    for(let kw of r.kw){
+      kw=vatStrip(kw);
+      const hit = kw.indexOf(" ")>=0 ? full.indexOf(kw)>=0 : toks.some(t=>t.indexOf(kw)===0);
+      if(hit) return r;
+    }
+  }
+  return {rate:"23%", cat:"stawka podstawowa", note:"Większość towarów i usług. Jeśli to żywność, książki albo usługa społeczna/medyczna — sprawdź dokładniej; 23% to wartość domyślna."};
+}
 function renderVAT(){
   const box=$("#vatBox"); if(!box || box.dataset.done) return;
   box.dataset.done="1";
-  const groups=VAT_TABLE.map(g=>{
-    const rows=g.rows.map(r=>`<tr><td class="vt-to">${esc(r.to)}</td><td class="vt-rate">${esc(r.rate)}${r.note?` <span class="vt-note">(${esc(r.note)})</span>`:""}</td></tr>`).join("");
-    return `<div class="vt-group"><div class="vt-from">Sprzedaż z: <b>${esc(g.from)}</b></div>
-      <table class="vt"><thead><tr><th>Do kogo</th><th>Stawka VAT</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  box.innerHTML=`
+    <div class="vat-tool">
+      <div class="vat-th">Weryfikator stawki VAT (Polska)</div>
+      <p class="vat-sub">Wpisz towar lub usługę, a podpowiem najbardziej prawdopodobną polską stawkę. To wskazówka, nie wiążąca interpretacja.</p>
+      <input id="vatQ" class="vat-input" type="text" placeholder="np. książka, nocleg, usługi księgowe, chleb, kawa…" autocomplete="off">
+      <div class="vat-chips" id="vatExamples"></div>
+      <div id="vatResult"></div>
+      <p class="vat-caveat">Pewność daje <b>WIS</b> (Wiążąca Informacja Stawkowa) — wniosek przez e-Urząd Skarbowy, chroni przy kontroli. Klasyfikację ustala się wg CN/PKWiU.</p>
+    </div>
+    <div class="vat-tool">
+      <div class="vat-th">Stawki VAT według państwa</div>
+      <p class="vat-sub">Cały świat — ponad 130 państw pogrupowanych regionami. Stawka standardowa i obniżone. Stan: styczeń 2026 (orientacyjnie).</p>
+      <select id="vatCountry" class="vat-input"></select>
+      <div id="vatCountryResult"></div>
+    </div>`;
+  const ex=["książka","nocleg w hotelu","usługi księgowe","chleb","kawa","fryzjer","leki","eksport"];
+  $("#vatExamples").innerHTML=ex.map(e=>`<button class="vat-chip" data-vex="${esc(e)}">${esc(e)}</button>`).join("");
+  $("#vatExamples").querySelectorAll("[data-vex]").forEach(b=>b.onclick=()=>{ $("#vatQ").value=b.dataset.vex; vatShowResult(); });
+  $("#vatQ").addEventListener("input", vatShowResult);
+  const sel=$("#vatCountry");
+  sel.innerHTML=VAT_REGIONS.map(rg=>{
+    const opts=VAT_COUNTRIES.map((c,i)=>c.region===rg?`<option value="${i}">${c.flag} ${esc(c.name)}</option>`:"").join("");
+    return `<optgroup label="${esc(rg)}">${opts}</optgroup>`;
   }).join("");
-  box.innerHTML=`<div class="sci-head" style="margin-top:6px">Stawki VAT — sprzedaż transgraniczna</div>${groups}
-    <p class="livehint" style="margin-top:6px">Orientacyjnie, według Twojej tabeli. Faktyczna stawka zależy od statusu nabywcy, miejsca opodatkowania i progów (OSS, eksport, WDT) — przy wątpliwości potwierdź z przepisami.</p>`;
+  const pl=VAT_COUNTRIES.findIndex(c=>c.name==="Polska");
+  sel.value=pl>=0?pl:0;
+  sel.addEventListener("change", vatShowCountry);
+  vatShowCountry();
+}
+function vatShowResult(){
+  const out=$("#vatResult"); if(!out) return;
+  const q=($("#vatQ").value||"").trim();
+  if(q.length<2){ out.innerHTML=""; return; }
+  const r=vatVerify(q), col=VAT_COL[r.rate]||"#555";
+  out.innerHTML=`<div class="vat-res">
+    <div class="vat-badge" style="background:${col}">${esc(r.rate)}</div>
+    <div class="vat-resmain"><div class="vat-rescat">${esc(r.cat)}</div><div class="vat-resnote">${esc(r.note)}</div></div>
+  </div>`;
+}
+function vatShowCountry(){
+  const sel=$("#vatCountry"), out=$("#vatCountryResult"); if(!sel||!out) return;
+  const c=VAT_COUNTRIES[+sel.value]; if(!c) return;
+  const fmt=x=>String(x).replace(".",",")+"%";
+  const stdDisp=(c.std==null)?"brak VAT":fmt(c.std);
+  const reduced=(c.std==null)?`<span class="vat-rnone">podatek od sprzedaży zamiast VAT</span>`
+    :((c.red&&c.red.length)?c.red.map(x=>`<span class="vat-rchip">${fmt(x)}</span>`).join(""):`<span class="vat-rnone">brak stawek obniżonych</span>`);
+  out.innerHTML=`<div class="vat-country">
+    <div class="vat-cstd"><span class="vat-cstd-lbl">Stawka standardowa</span><span class="vat-cstd-val" style="color:${(c.std==null)?'#888':'#8a2e2a'}">${esc(stdDisp)}</span>${c.tax?`<span class="vat-cstd-tax">${esc(c.tax)}</span>`:""}</div>
+    <div class="vat-cred"><span class="vat-cred-lbl">Stawki obniżone</span><div class="vat-cred-row">${reduced}</div></div>
+    ${c.note?`<div class="vat-cnote">${esc(c.note)}</div>`:""}
+  </div>`;
 }
 function renderStawki(){
   const sb=$("#sciagawkaBox");
@@ -2482,7 +2737,7 @@ const SUBTABS = {
   legis:   [["proc","W trakcie procedowania","#rclView"], ["wchodza","Wkrótce wchodzą / opublikowane","#legisView"]],
   terminy: [["lista","Terminy","#terminyMain"], ["kalk","Kalkulator terminu","#termCalcWrap"]],
   kursy:   [["kursy","Kursy walut","#kursyRates"], ["kalk","Przelicznik walut","#kursyConv"]],
-  stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT zagranica","#stawkiVat"]],
+  stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT","#stawkiVat"]],
   kalk:    [["jdg","JDG","#kalkJdg"], ["spzoo","Spółka z o.o.","#kalkSpzoo"]],
 };
 function fillSubBars(){
