@@ -1001,12 +1001,25 @@ TEMPLATE = r'''<!DOCTYPE html>
   .rate .rm{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--accent)}
   .rate .rn{font-size:10.5px;color:var(--ink-faint)}
   .sci-head{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin:24px 2px 12px}
-  .scigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:11px}
+  .scigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
   .sci{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);
-    border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:2px}
+    border-radius:10px;padding:13px 15px;display:flex;flex-direction:column;gap:3px;
+    box-shadow:0 1px 3px rgba(40,30,20,.06)}
   .sci .sl{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
   .sci .sv{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink)}
   .sci .sn{font-size:11.5px;color:var(--ink-faint);line-height:1.35}
+  .zus-schemes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .zus-s{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface);
+    box-shadow:0 1px 3px rgba(40,30,20,.06);display:flex;flex-direction:column;gap:5px}
+  .zus-s b{font-family:var(--serif);font-size:14.5px;color:var(--ink)}
+  .zus-s span{font-size:12px;color:var(--ink-soft);line-height:1.45}
+  .zus-s span b{font-family:var(--sans);font-size:12px;color:var(--accent)}
+  .sciadd{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .sciadd .search{flex:1 1 180px;min-width:140px;margin:0}
+  .sci-mine{position:relative;border-left-color:#2a6a7a}
+  .sci-del{position:absolute;top:8px;right:9px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-faint);font-size:14px;line-height:1;cursor:pointer;padding:0}
+  .sci-del:hover{border-color:var(--accent);color:var(--accent)}
   /* przelicznik walut */
   .conv-head{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin:24px 2px 12px}
   .conv{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
@@ -1165,10 +1178,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <main id="feed"></main>
     </section>
 
-    <div id="legisSubBar" class="subtabs" hidden>
-      <button class="subtab on" data-lsub="proc">W trakcie procedowania</button>
-      <button class="subtab" data-lsub="wchodza">Wkrótce wchodzą / opublikowane</button>
-    </div>
+    <div id="legisSubBar" class="subtabs" data-subbar="legis" hidden></div>
 
     <section id="legisView" hidden>
       <div class="controls">
@@ -1227,26 +1237,28 @@ TEMPLATE = r'''<!DOCTYPE html>
     </section>
 
     <section id="terminyView" hidden>
-      <div class="controls">
-        <div class="chips" id="termChips"></div>
-        <p class="livehint" style="margin:10px 2px 0">Najbliższe terminy podatkowe i sprawozdawcze. Daty już <b>przesunięte</b>, gdy wypadają w sobotę/niedzielę/święto (art. 12 §5 Ordynacji). Liczone na dziś w Twojej przeglądarce. To <b>ogólny terminarz</b> dla typowych przypadków — które terminy faktycznie Cię dotyczą, zależy od formy klienta (VAT mies./kwart., skala/ryczałt, spółka/JDG). Filtruj chipami wyżej.</p>
+      <div class="subtabs" data-subbar="terminy"></div>
+      <div id="terminyMain">
+        <div class="controls">
+          <div class="chips" id="termChips"></div>
+          <p class="livehint" style="margin:10px 2px 0">Najbliższe terminy podatkowe i sprawozdawcze. Daty już <b>przesunięte</b>, gdy wypadają w sobotę/niedzielę/święto (art. 12 §5 Ordynacji). Liczone na dziś w Twojej przeglądarce. To <b>ogólny terminarz</b> dla typowych przypadków — które terminy faktycznie Cię dotyczą, zależy od formy klienta (VAT mies./kwart., skala/ryczałt, spółka/JDG). Filtruj chipami wyżej.</p>
+        </div>
+        <div id="terminyList"></div>
       </div>
-      <div id="terminyList"></div>
-      <div id="termCalc"></div>
+      <div id="termCalcWrap"><div id="termCalc"></div></div>
     </section>
 
     <section id="kursyView" hidden>
-      <div class="controls">
-        <div id="nbpBox"></div>
-        <div id="kursyCalc"></div>
-      </div>
+      <div class="subtabs" data-subbar="kursy"></div>
+      <div id="kursyRates"><div class="controls"><div id="nbpBox"></div></div></div>
+      <div id="kursyConv"><div class="controls"><div id="kursyCalc"></div></div></div>
     </section>
 
     <section id="stawkiView" hidden>
-      <div class="controls">
-        <div id="sciagawkaBox"></div>
-        <div id="vatBox"></div>
-      </div>
+      <div class="subtabs" data-subbar="stawki"></div>
+      <div id="stawkiSciaga"><div class="controls"><div id="sciagawkaBox"></div><div id="sciagaCustom"></div></div></div>
+      <div id="stawkiZus"><div class="controls"><div id="zusBox"></div></div></div>
+      <div id="stawkiVat"><div class="controls"><div id="vatBox"></div></div></div>
     </section>
 
     <section id="kalkView" hidden>
@@ -1283,11 +1295,13 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(), legisSub:"proc" };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(),
+  sub:{ legis:"proc", terminy:"lista", kursy:"kursy", stawki:"sciaga" }, sciaga:[] };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
 try{ const s=localStorage.getItem("paragraf-termoff"); if(s) state.termOff=new Set(JSON.parse(s)); }catch(e){}
+try{ const s=localStorage.getItem("paragraf-sciaga"); if(s) state.sciaga=JSON.parse(s)||[]; }catch(e){}
 // "Nowe od ostatniej wizyty": zapamietujemy znacznik poprzedniej wizyty (do podswietlania),
 // a nowy zapisujemy tylko gdy minelo >20 min - dzieki temu szybkie F5 nie kasuje podswietlen.
 let LAST_VISIT=0;
@@ -2155,25 +2169,69 @@ function renderVAT(){
     return `<div class="vt-group"><div class="vt-from">Sprzedaż z: <b>${esc(g.from)}</b></div>
       <table class="vt"><thead><tr><th>Do kogo</th><th>Stawka VAT</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }).join("");
-  box.innerHTML=`<div class="sci-head" style="margin-top:26px">Stawki VAT — sprzedaż transgraniczna</div>${groups}
+  box.innerHTML=`<div class="sci-head" style="margin-top:6px">Stawki VAT — sprzedaż transgraniczna</div>${groups}
     <p class="livehint" style="margin-top:6px">Orientacyjnie, według Twojej tabeli. Faktyczna stawka zależy od statusu nabywcy, miejsca opodatkowania i progów (OSS, eksport, WDT) — przy wątpliwości potwierdź z przepisami.</p>`;
 }
 function renderStawki(){
   const sb=$("#sciagawkaBox");
   if(sb && !sb.dataset.done){
     sb.dataset.done="1";
-    sb.innerHTML=`<div class="sci-head">Ściągawka — stan na 2026</div>
+    sb.innerHTML=`<div class="sci-head" style="margin-top:6px">Ściągawka — stan na 2026</div>
     <div class="scigrid">
       <div class="sci"><span class="sl">Zwolnienie podmiotowe VAT</span><span class="sv">240 000 zł / rok</span><span class="sn">od 1.01.2026 (wcześniej 200 000 zł)</span></div>
       <div class="sci"><span class="sl">Limit ryczałtu</span><span class="sv">2 000 000 EUR</span><span class="sn">przychód za rok poprzedni · kwartalnie do 200 000 EUR</span></div>
       <div class="sci"><span class="sl">Dieta krajowa</span><span class="sv">45 zł / dobę</span><span class="sn">8–12 h = 50% · powyżej 12 h = 100%</span></div>
       <div class="sci"><span class="sl">Kilometrówka</span><span class="sv">0,89 / 1,15 zł/km</span><span class="sn">≤900 cm³ / powyżej 900 cm³ · motocykl 0,69 · motorower 0,42</span></div>
-      <div class="sci"><span class="sl">Składki społeczne (% podstawy)</span><span class="sv">em. 19,52% · rent. 8% · chor. 2,45%</span><span class="sn">wypadkowa ok. 1,67% (typowa) · zdrowotna 9%</span></div>
+      <div class="sci"><span class="sl">Skala podatkowa</span><span class="sv">12% / 32%</span><span class="sn">próg 120 000 zł · kwota wolna 30 000 zł</span></div>
+      <div class="sci"><span class="sl">Podatek liniowy</span><span class="sv">19%</span><span class="sn">+ danina solidarnościowa 4% powyżej 1 mln zł dochodu</span></div>
     </div>
     <p class="livehint" style="margin-top:8px">⚠ Wartości zmieniają się co roku (zwłaszcza kwoty ZUS i progi) — przed użyciem sprawdź aktualność u źródła. To skrót poglądowy, nie porada podatkowa.</p>`;
   }
+  renderSciagaCustom();
+  renderZus();
   renderVAT();
   return 0;
+}
+function renderZus(){
+  const box=$("#zusBox"); if(!box || box.dataset.done) return;
+  box.dataset.done="1";
+  box.innerHTML=`<div class="sci-head" style="margin-top:6px">Składki ZUS — stawki i schematy</div>
+    <div class="scigrid">
+      <div class="sci"><span class="sl">Emerytalna</span><span class="sv">19,52%</span><span class="sn">podstawy wymiaru</span></div>
+      <div class="sci"><span class="sl">Rentowa</span><span class="sv">8,00%</span><span class="sn">podstawy wymiaru</span></div>
+      <div class="sci"><span class="sl">Chorobowa</span><span class="sv">2,45%</span><span class="sn">dobrowolna dla przedsiębiorcy</span></div>
+      <div class="sci"><span class="sl">Wypadkowa</span><span class="sv">~1,67%</span><span class="sn">typowa; zależy od kodu PKD/zgłoszonych</span></div>
+      <div class="sci"><span class="sl">Fundusz Pracy</span><span class="sv">2,45%</span><span class="sn">gdy podstawa ≥ minimalnego wynagrodzenia</span></div>
+      <div class="sci"><span class="sl">Zdrowotna — skala</span><span class="sv">9%</span><span class="sn">od dochodu (min. roczna 5 190,48 zł)</span></div>
+      <div class="sci"><span class="sl">Zdrowotna — liniowy</span><span class="sv">4,9%</span><span class="sn">od dochodu (min. roczna 5 190,48 zł)</span></div>
+      <div class="sci"><span class="sl">Zdrowotna — ryczałt</span><span class="sv">3 progi</span><span class="sn">wg przychodu: do 60 tys. / do 300 tys. / powyżej</span></div>
+    </div>
+    <div class="sci-head" style="margin-top:22px">Schematy składek społecznych (JDG)</div>
+    <div class="zus-schemes">
+      <div class="zus-s"><b>Ulga na start</b><span>Pierwsze <b>6 miesięcy</b> bez składek społecznych (płacisz tylko zdrowotną). Dobrowolna.</span></div>
+      <div class="zus-s"><b>Preferencyjny ZUS (mały ZUS)</b><span>Kolejne <b>24 miesiące</b> — podstawa = 30% minimalnego wynagrodzenia (niższe składki społeczne).</span></div>
+      <div class="zus-s"><b>Mały ZUS Plus</b><span>Składki <b>zależne od dochodu</b> z poprzedniego roku. Limit przychodu i max <b>36 miesięcy</b> w okresie 60 miesięcy. Nie łączy się z ulgą na start/preferencyjnym w tym samym czasie.</span></div>
+      <div class="zus-s"><b>Pełny ZUS</b><span>Podstawa standardowa (60% prognozowanego przeciętnego wynagrodzenia) — gdy nie przysługują/wyczerpią się ulgi.</span></div>
+    </div>
+    <p class="livehint" style="margin-top:10px">⚠ Konkretne <b>kwoty</b> składek zmieniają się co roku — tu pokazuję stawki procentowe i zasady. Wybór schematu i kwoty potwierdź w ZUS / u księgowego.</p>`;
+}
+function sciagaSave(){ try{ localStorage.setItem("paragraf-sciaga", JSON.stringify(state.sciaga)); }catch(_){} }
+function renderSciagaCustom(){
+  const box=$("#sciagaCustom"); if(!box) return;
+  const items=(state.sciaga||[]).map((it,i)=>`<div class="sci sci-mine"><button class="sci-del" data-sdel="${i}" title="Usuń">×</button><span class="sl">${esc(it.n)}</span><span class="sv">${esc(it.v||"")}</span>${it.note?`<span class="sn">${esc(it.note)}</span>`:""}</div>`).join("");
+  box.innerHTML=`<div class="sci-head" style="margin-top:22px">Twoje pozycje</div>
+    <div class="sciadd">
+      <input id="sciN" class="search" type="text" placeholder="Nazwa (np. Mój limit faktury)" autocomplete="off">
+      <input id="sciV" class="search" type="text" placeholder="Wartość (np. 5 000 zł)" autocomplete="off">
+      <button class="livebtn" id="sciAdd">Dodaj</button>
+    </div>
+    ${items?`<div class="scigrid" style="margin-top:11px">${items}</div>`:`<p class="livehint" style="margin-top:6px">Dodaj własne stawki/limity/notatki — zapisują się w tej przeglądarce.</p>`}`;
+  const add=()=>{ const n=($("#sciN").value||"").trim(), v=($("#sciV").value||"").trim();
+    if(!n){ $("#sciN").focus(); return; } state.sciaga.push({n,v}); sciagaSave(); renderSciagaCustom(); };
+  const ab=$("#sciAdd"); if(ab) ab.onclick=add;
+  const nI=$("#sciN"); if(nI) nI.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+  const vI=$("#sciV"); if(vI) vI.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+  box.querySelectorAll("[data-sdel]").forEach(b=>b.onclick=()=>{ state.sciaga.splice(+b.dataset.sdel,1); sciagaSave(); renderSciagaCustom(); });
 }
 
 // ===== KALKULATOR obciazen JDG (liniowy / ryczalt / skala) =====
@@ -2238,7 +2296,7 @@ function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
   let c;
-  if(state.tab==="legis") c=(state.legisSub==="proc"?r:u);
+  if(state.tab==="legis") c=(state.sub.legis==="proc"?r:u);
   else if(state.tab==="moje") c=mj;
   else if(state.tab==="terminy") c=renderTerminy();
   else if(state.tab==="kursy") c=renderKursy();
@@ -2251,13 +2309,28 @@ function render(){
   syncAddBtns();
 }
 
-function applyLegisSub(){
-  if(!state.legisSub) state.legisSub="proc";
-  const inLegis = state.tab==="legis";
-  const sb=$("#legisSubBar"); if(sb) sb.hidden = !inLegis;
-  $("#legisView").hidden = !(inLegis && state.legisSub==="wchodza");
-  $("#rclView").hidden   = !(inLegis && state.legisSub==="proc");
-  document.querySelectorAll("[data-lsub]").forEach(b=>b.classList.toggle("on", b.dataset.lsub===state.legisSub));
+// --- generyczny mechanizm podzakladek (jedna logika dla Ustaw, Terminow, Kursow, Stawek) ---
+const SUBTABS = {
+  legis:   [["proc","W trakcie procedowania","#rclView"], ["wchodza","Wkrótce wchodzą / opublikowane","#legisView"]],
+  terminy: [["lista","Terminy","#terminyMain"], ["kalk","Kalkulator terminu","#termCalcWrap"]],
+  kursy:   [["kursy","Kursy walut","#kursyRates"], ["kalk","Przelicznik walut","#kursyConv"]],
+  stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT zagranica","#stawkiVat"]],
+};
+function fillSubBars(){
+  Object.keys(SUBTABS).forEach(tab=>{
+    const bar=document.querySelector(`[data-subbar="${tab}"]`); if(!bar) return;
+    bar.innerHTML=SUBTABS[tab].map(([k,label])=>`<button class="subtab" data-sub="${tab}:${k}">${esc(label)}</button>`).join("");
+  });
+  document.querySelectorAll("[data-sub]").forEach(b=>b.onclick=()=>{
+    const i=b.dataset.sub.indexOf(":"); const tab=b.dataset.sub.slice(0,i), k=b.dataset.sub.slice(i+1);
+    state.sub[tab]=k; applySub(tab); render();
+  });
+}
+function applySub(tab){
+  const cfg=SUBTABS[tab]; if(!cfg) return;
+  const cur=state.sub[tab];
+  cfg.forEach(([k,,view])=>{ const el=$(view); if(el) el.hidden=(k!==cur); });
+  document.querySelectorAll(`[data-sub^="${tab}:"]`).forEach(b=>b.classList.toggle("on", b.dataset.sub===tab+":"+cur));
 }
 function switchTab(t){
   state.tab=t;
@@ -2270,7 +2343,14 @@ function switchTab(t){
   $("#kursyView").hidden = t!=="kursy";
   $("#stawkiView").hidden = t!=="stawki";
   $("#kalkView").hidden = t!=="kalk";
-  applyLegisSub();   // steruje #legisSubBar + #legisView + #rclView
+  // Ustawy: pasek podzakladek + dwa widoki na poziomie glownym
+  const inLegis=(t==="legis");
+  $("#legisSubBar").hidden = !inLegis;
+  if(inLegis){ applySub("legis"); } else { $("#legisView").hidden=true; $("#rclView").hidden=true; }
+  // zakladki z podzakladkami wewnatrz sekcji
+  if(t==="terminy") applySub("terminy");
+  if(t==="kursy") applySub("kursy");
+  if(t==="stawki") applySub("stawki");
   render();
 }
 
@@ -2294,7 +2374,7 @@ function switchTab(t){
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-  document.querySelectorAll("[data-lsub]").forEach(b=>b.onclick=()=>{ state.legisSub=b.dataset.lsub; applyLegisSub(); render(); });
+  fillSubBars();
   // delegacja: „+" dodaj / „✓" usuń (na kartach) oraz usuń w „Moje"
   document.body.addEventListener("click", e=>{
     const add=e.target.closest(".addbtn[data-item]");
