@@ -964,6 +964,25 @@ TEMPLATE = r'''<!DOCTYPE html>
   .ttitle{font-size:14px;font-weight:600;color:var(--ink);line-height:1.34}
   .tmeta{font-size:11.5px;color:var(--ink-soft);margin-top:6px}
   .tnote{font-size:11.5px;color:var(--ink-faint);margin-top:4px;line-height:1.35}
+  /* eksport do kalendarza + kalkulator terminu */
+  .tcal{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);flex-wrap:wrap}
+  .tcal-lab{font-size:10.5px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .tcal-l{font-size:11.5px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);
+    border-radius:7px;padding:2px 9px}
+  .tcal-l:hover{background:rgba(138,46,42,.06)}
+  .tdl-all{display:inline-block;margin-bottom:14px;font-size:12.5px;font-weight:600;color:var(--accent);
+    text-decoration:none;border:1px solid var(--accent);border-radius:9px;padding:6px 13px}
+  .tdl-all:hover{background:rgba(138,46,42,.06)}
+  .trc{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .trc-out{margin-top:12px}
+  .trc-res{font-size:14px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);
+    border-radius:9px;padding:9px 13px}
+  .trc-res b{font-family:var(--serif);color:var(--ink);font-size:15px}
+  .trc-when{color:var(--ink-faint);font-weight:600}
+  .trc-now{border-color:rgba(176,124,42,.4);background:rgba(176,124,42,.1)}
+  .trc-now .trc-when{color:#8a5a2e}
+  .trc-past{opacity:.7}
+  .trc-desc{font-size:12px;color:var(--ink-faint);line-height:1.4;margin-top:7px}
   /* nowe od ostatniej wizyty */
   .newbar{background:rgba(138,46,42,.07);border:1px solid rgba(138,46,42,.18);color:var(--accent);
     border-radius:9px;padding:9px 13px;font-size:13px;font-weight:600;margin-bottom:14px}
@@ -988,6 +1007,48 @@ TEMPLATE = r'''<!DOCTYPE html>
   .sci .sl{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
   .sci .sv{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink)}
   .sci .sn{font-size:11.5px;color:var(--ink-faint);line-height:1.35}
+  /* przelicznik walut */
+  .conv-head{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin:24px 2px 12px}
+  .conv{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .conv-amt{width:130px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:15px;
+    font-family:var(--serif);background:var(--surface);color:var(--ink)}
+  .conv-cur{padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;
+    background:var(--surface);color:var(--ink);max-width:260px}
+  .conv-eq{font-size:18px;color:var(--ink-faint)}
+  .conv-out{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--accent);min-width:120px}
+  .conv-swap{border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:9px;
+    width:38px;height:38px;font-size:16px;cursor:pointer}
+  .conv-swap:hover{background:rgba(0,0,0,.04)}
+  /* tabela VAT */
+  .vt-group{margin:14px 0}
+  .vt-from{font-size:13px;color:var(--ink-soft);margin-bottom:6px}
+  .vt-from b{color:var(--ink)}
+  table.vt{width:100%;border-collapse:collapse;font-size:13px}
+  table.vt th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);
+    font-weight:700;padding:5px 10px;border-bottom:1px solid var(--line)}
+  table.vt td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.vt .vt-rate{font-family:var(--serif);font-weight:600;color:var(--ink);white-space:nowrap}
+  table.vt .vt-note{font-family:var(--sans);font-size:11px;font-weight:400;color:var(--ink-faint);white-space:normal}
+  table.vt tr:last-child td{border-bottom:none}
+  /* kalkulator */
+  .kalk-inputs{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .kin{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
+  .kin input,.kin select{padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:14px;
+    font-family:var(--serif);background:var(--surface);color:var(--ink);min-width:150px}
+  .kc-dochod{font-size:13px;color:var(--ink-soft);margin-bottom:12px}
+  .kc-dochod b{font-family:var(--serif);font-size:15px;color:var(--ink)}
+  .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+  .kc{position:relative;border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:var(--surface)}
+  .kc-best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .kc-badge{position:absolute;top:-9px;left:14px;background:var(--accent);color:#f3e9df;font-size:9.5px;
+    font-weight:700;letter-spacing:.04em;padding:2px 9px;border-radius:999px;text-transform:uppercase}
+  .kc-h{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .kr{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;color:var(--ink-soft);padding:3px 0}
+  .kr b{font-family:var(--serif);font-weight:600;color:var(--ink);white-space:nowrap}
+  .kr-sum{margin-top:6px;padding-top:7px;border-top:1px solid var(--line);font-weight:600;color:var(--ink)}
+  .kr-net b{color:var(--accent);font-size:15px}
+  .kc-off{opacity:.7}
+  .kc-na{font-size:12px;color:var(--ink-faint);line-height:1.4}
   /* rozwijana karta etapów rządowych (RCL) */
   .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
@@ -1044,6 +1105,11 @@ TEMPLATE = r'''<!DOCTYPE html>
     font-family:inherit;transition:.15s;text-align:center}
   .srcbtn:hover{border-color:var(--accent);color:var(--accent)}
   .srcbtn.on{background:var(--accent);border-color:var(--accent);color:#f3e9df}
+  .subtabs{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .subtab{padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-soft);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .subtab:hover{border-color:var(--accent);color:var(--accent)}
+  .subtab.on{background:var(--accent);border-color:var(--accent);color:#f3e9df}
   .tabbadge{display:none;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);
     color:#f3e9df;font-size:10px;font-weight:700;line-height:17px;text-align:center;margin-left:6px;vertical-align:middle}
   .tabbadge.show{display:inline-block}
@@ -1078,9 +1144,10 @@ TEMPLATE = r'''<!DOCTYPE html>
     <nav class="tabs">
       <button class="tab on" data-tab="news">Wiadomości<span class="tabbadge" id="newsBadge"></span></button>
       <button class="tab" data-tab="terminy">Terminy</button>
-      <button class="tab" data-tab="wskazniki">Wskaźniki</button>
+      <button class="tab" data-tab="kursy">Kursy</button>
+      <button class="tab" data-tab="stawki">Stawki</button>
+      <button class="tab" data-tab="kalk">Kalkulator</button>
       <button class="tab" data-tab="legis">Ustawy</button>
-      <button class="tab" data-tab="rcl">RCL</button>
       <button class="tab" data-tab="wyroki">Wyroki</button>
       <button class="tab" data-tab="kis">Interpretacje</button>
       <button class="tab" data-tab="moje">Moje<span class="tabbadge" id="mojeBadge"></span></button>
@@ -1097,6 +1164,11 @@ TEMPLATE = r'''<!DOCTYPE html>
 
       <main id="feed"></main>
     </section>
+
+    <div id="legisSubBar" class="subtabs" hidden>
+      <button class="subtab on" data-lsub="proc">W trakcie procedowania</button>
+      <button class="subtab" data-lsub="wchodza">Wkrótce wchodzą / opublikowane</button>
+    </div>
 
     <section id="legisView" hidden>
       <div class="controls">
@@ -1126,14 +1198,14 @@ TEMPLATE = r'''<!DOCTYPE html>
     <section id="wyrokiView" hidden>
       <div class="controls">
         <div class="srcToggle" id="wyrokiSrc">
-          <button class="srcbtn on" data-src="saos">SAOS — sądy powszechne, SN, TK, KIO</button>
-          <button class="srcbtn" data-src="cbosa">CBOSA — NSA/WSA (podatkowe)</button>
+          <button class="srcbtn on" data-src="saos">SAOS — wyniki w aplikacji (też NSA/WSA)</button>
+          <button class="srcbtn" data-src="cbosa">CBOSA — pełniejsza baza podatkowa (otwiera się)</button>
         </div>
         <div class="searchrow">
           <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: VAT, ulga, koszty, zwolnienie…  (Enter)" autocomplete="off">
           <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen">Szukaj</button>
         </div>
-        <p class="livehint"><b>SAOS</b> ma API, więc wyniki pokazuję tu w aplikacji — ale to sądy powszechne/SN/TK/KIO, <b>bez podatkowych</b>. Sprawy podatkowe (NSA/WSA) są w <b>CBOSA</b>, która blokuje automatyczny dostęp i nie ma API — dlatego dla niej kopiuję frazę i otwieram jej wyszukiwarkę.</p>
+        <p class="livehint"><b>SAOS</b> ma API, więc wyniki pokazuję tu w aplikacji. Obejmuje sądy powszechne, SN, TK, KIO <b>oraz sądy administracyjne (NSA/WSA)</b> — czyli orzeczenia podatkowe też się pojawiają, choć jego baza administracyjna bywa mniej kompletna i aktualna niż CBOSA. Po najpełniejsze i najnowsze orzecznictwo podatkowe przełącz na <b>CBOSA</b> — nie ma API i blokuje automatyczny dostęp, więc dla niej kopiuję frazę i otwieram jej wyszukiwarkę.</p>
       </div>
       <div id="wyrokiResults"></div>
     </section>
@@ -1160,12 +1232,44 @@ TEMPLATE = r'''<!DOCTYPE html>
         <p class="livehint" style="margin:10px 2px 0">Najbliższe terminy podatkowe i sprawozdawcze. Daty już <b>przesunięte</b>, gdy wypadają w sobotę/niedzielę/święto (art. 12 §5 Ordynacji). Liczone na dziś w Twojej przeglądarce. To <b>ogólny terminarz</b> dla typowych przypadków — które terminy faktycznie Cię dotyczą, zależy od formy klienta (VAT mies./kwart., skala/ryczałt, spółka/JDG). Filtruj chipami wyżej.</p>
       </div>
       <div id="terminyList"></div>
+      <div id="termCalc"></div>
     </section>
 
-    <section id="wskazView" hidden>
+    <section id="kursyView" hidden>
       <div class="controls">
         <div id="nbpBox"></div>
+        <div id="kursyCalc"></div>
+      </div>
+    </section>
+
+    <section id="stawkiView" hidden>
+      <div class="controls">
         <div id="sciagawkaBox"></div>
+        <div id="vatBox"></div>
+      </div>
+    </section>
+
+    <section id="kalkView" hidden>
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Przychód netto / rok</span><input id="kalkP" type="number" inputmode="decimal" value="300000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty / rok</span><input id="kalkK" type="number" inputmode="decimal" value="100000" min="0" step="any"></label>
+          <label class="kin"><span>ZUS społeczny / rok</span><input id="kalkZ" type="number" inputmode="decimal" value="21459.48" min="0" step="any"></label>
+          <label class="kin"><span>Stawka ryczałtu</span><select id="kalkR">
+            <option value="0.17">17%</option>
+            <option value="0.15">15%</option>
+            <option value="0.14">14%</option>
+            <option value="0.125">12,5%</option>
+            <option value="0.12">12%</option>
+            <option value="0.10">10%</option>
+            <option value="0.085" selected>8,5%</option>
+            <option value="0.055">5,5%</option>
+            <option value="0.03">3%</option>
+            <option value="0.02">2%</option>
+          </select></label>
+        </div>
+        <div id="kalkResults"></div>
+        <p class="livehint" style="margin-top:10px">Założenia: standardowy ZUS 2026 (możesz nadpisać), składki należne, dochód = przychód − koszty. Orientacyjnie, dla jednoosobowej działalności — nie jest to porada podatkowa.</p>
       </div>
     </section>
 
@@ -1179,7 +1283,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set() };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(), legisSub:"proc" };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
@@ -1451,15 +1555,17 @@ function _race(urls, asText){
     });
   });
 }
-async function getJSON(u){
-  if(_cache.has("j"+u)) return _cache.get("j"+u);
+async function getJSON(u, fresh){
+  if(!fresh && _cache.has("j"+u)) return _cache.get("j"+u);
   const v = await _race(PXY.map(p=>p(u)), false);
-  _cache.set("j"+u, v); return v;
+  if(v!=null) _cache.set("j"+u, v);   // nie zapamietuj nieudanej proby (null), zeby ponowienie dzialalo
+  return v;
 }
-async function getText(u){
-  if(_cache.has("t"+u)) return _cache.get("t"+u);
+async function getText(u, fresh){
+  if(!fresh && _cache.has("t"+u)) return _cache.get("t"+u);
   const v = await _race([PXY[1],PXY[2],PXY[3],PXY[0]].map(p=>p(u)), true);
-  _cache.set("t"+u, v); return v;
+  if(v!=null) _cache.set("t"+u, v);
+  return v;
 }
 // Dz.U./M.P. — wyszukiwanie w zakładce „Ustawy"
 async function searchDU(){
@@ -1583,7 +1689,7 @@ async function searchWyroki(){
     try{ window.open("https://orzeczenia.nsa.gov.pl/cbo/query", "_blank", "noopener"); }catch(_){}
     box.innerHTML=`<div class="kis-launch">
       <p>${copied?'Skopiowałem frazę <b>„'+esc(q)+'"</b> do schowka.':'Fraza: <b>„'+esc(q)+'"</b>.'} Otworzyłem wyszukiwarkę <b>CBOSA</b> (NSA/WSA) w nowej karcie — wklej (Ctrl+V) w pole „Szukana fraza" i naciśnij „Szukaj".</p>
-      <p class="kis-alt">CBOSA blokuje automatyczne pobieranie i nie ma API, dlatego nie da się jej wyników wciągnąć tutaj. To jedyne pełne źródło orzeczeń podatkowych (sądy administracyjne).</p>
+      <p class="kis-alt">CBOSA blokuje automatyczne pobieranie i nie ma API, dlatego nie da się jej wyników wciągnąć tutaj. To najpełniejsze i najnowsze źródło orzeczeń podatkowych (sądy administracyjne) — SAOS też je ma, ale w węższym zakresie.</p>
     </div>`;
     return;
   }
@@ -1596,7 +1702,7 @@ async function searchWyroki(){
   }catch(e){}
   btn.disabled=false;
   if(!items.length){
-    box.innerHTML=`<div class="live-status">Nic nie znalazłem w SAOS dla „${esc(q)}". Uwaga: SAOS nie ma spraw podatkowych — dla nich przełącz na <b>CBOSA</b> wyżej. Albo kliknij ponownie (przekaźnik mógł nie odpowiedzieć).</div>`;
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem w SAOS dla „${esc(q)}". SAOS obejmuje też sądy administracyjne, ale jego baza podatkowa bywa niepełna — spróbuj innych słów albo przełącz na <b>CBOSA</b> (pełniejsza baza NSA/WSA). Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.</div>`;
     return;
   }
   box.innerHTML=`<div class="live-sec-head">Orzeczenia (SAOS) — „${esc(q)}" (${items.length})</div><div class="lgrid">${items.map(wyrokCard).join("")}</div>`;
@@ -1747,7 +1853,7 @@ function updateMojeBadge(n){
 // ===== TERMINARZ PODATKOWY (czysta logika dat - bez API, liczone w przegladarce) =====
 const T_MIES=["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec","sierpień","wrzesień","październik","listopad","grudzień"];
 const T_DNI=["niedz.","pon.","wt.","śr.","czw.","pt.","sob."];
-const T_CAT={VAT:"#1d3a6b", PIT:"#8a2e2a", CIT:"#6b4a8a", ZUS:"#0f5c4a", Kadry:"#8a5a2e", Roczne:"#4a4a4a"};
+const T_CAT={VAT:"#1d3a6b", PIT:"#8a2e2a", CIT:"#6b4a8a", ZUS:"#0f5c4a", Kadry:"#8a5a2e", Roczne:"#4a4a4a", "Ceny transf.":"#2a6a7a"};
 // Reguly terminow. day=dzien ustawowy; months=miesiace wystepowania; okres=opis za jaki okres.
 const T_RULES=[
   {day:15, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"ZUS", label:"Składki ZUS — płatnicy będący osobami prawnymi", okres:"prev-month", note:"np. spółki z o.o., S.A."},
@@ -1768,7 +1874,13 @@ const T_RULES=[
   {day:31, months:[3], cat:"Roczne", label:"Sporządzenie sprawozdania finansowego", okres:"prev-year", note:"jednostki prowadzące księgi rachunkowe"},
   {day:30, months:[4], cat:"PIT", label:"PIT roczny (PIT-36/37/36L/28/38/39)", okres:"prev-year", note:"zeznania roczne osób fizycznych"},
   {day:20, months:[5], cat:"ZUS", label:"Roczne rozliczenie składki zdrowotnej", okres:"prev-year", note:"przedsiębiorcy"},
-  {day:30, months:[6], cat:"Roczne", label:"Zatwierdzenie sprawozdania finansowego", okres:"prev-year", note:"do 6 mies. po zakończeniu roku"}
+  {day:30, months:[6], cat:"Roczne", label:"Zatwierdzenie sprawozdania finansowego", okres:"prev-year", note:"do 6 mies. po zakończeniu roku"},
+  {day:31, months:[1], cat:"ZUS", label:"ZUS IWA — informacja do ustalenia składki wypadkowej", okres:"prev-year", note:"płatnicy spełniający warunki (m.in. ≥10 ubezpieczonych)"},
+  {day:31, months:[3], cat:"CIT", label:"IFT-2R — informacja o wypłatach do nierezydentów", okres:"prev-year", note:"koniec 3. mies. po roku podatkowym (rok kalendarzowy)"},
+  {day:31, months:[3], cat:"Ceny transf.", label:"Powiadomienie CbC-P", okres:"prev-year", note:"3 mies. po końcu roku grupy (rok kalendarzowy)"},
+  {day:31, months:[10], cat:"Ceny transf.", label:"Dokumentacja cen transferowych (local file)", okres:"prev-year", note:"koniec 10. mies. po roku podatkowym (rok kalendarzowy)"},
+  {day:30, months:[11], cat:"Ceny transf.", label:"Informacja o cenach transferowych TPR-C / TPR-P", okres:"prev-year", note:"koniec 11. mies. po roku podatkowym"},
+  {day:31, months:[12], cat:"Ceny transf.", label:"Raport CbC-R", okres:"prev-year", note:"12 mies. po końcu roku sprawozdawczego grupy"}
 ];
 const _holCache={};
 function tEaster(y){
@@ -1829,6 +1941,89 @@ function tUpcoming(days){
 }
 function tSaveOff(){ try{ localStorage.setItem("paragraf-termoff", JSON.stringify([...state.termOff])); }catch(_){} }
 function tLoadOff(){ try{ const r=localStorage.getItem("paragraf-termoff"); if(r) state.termOff=new Set(JSON.parse(r)); }catch(_){} }
+// --- eksport do kalendarza (.ics / Google) ---
+function icsDate(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0"); }
+function icsEsc(s){ return (s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
+function icsEvent(summary,d,desc){
+  const start=icsDate(d), end=icsDate(new Date(d.getFullYear(),d.getMonth(),d.getDate()+1));
+  const uid="paragraf-"+start+"-"+Math.random().toString(36).slice(2,8)+"@paragraf";
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
+  return ["BEGIN:VEVENT","UID:"+uid,"DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+start,"DTEND;VALUE=DATE:"+end,
+    "SUMMARY:"+icsEsc(summary), desc?("DESCRIPTION:"+icsEsc(desc)):"",
+    "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(summary),"TRIGGER:-P2D","END:VALARM",
+    "END:VEVENT"].filter(Boolean).join("\r\n");
+}
+function icsWrap(events){ return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Paragraf//PL","CALSCALE:GREGORIAN",...events,"END:VCALENDAR"].join("\r\n"); }
+function icsHref(ics){ return "data:text/calendar;charset=utf-8,"+encodeURIComponent(ics); }
+function gcalHref(summary,d,desc){
+  const start=icsDate(d), end=icsDate(new Date(d.getFullYear(),d.getMonth(),d.getDate()+1));
+  const p=new URLSearchParams({action:"TEMPLATE", text:summary, dates:start+"/"+end, details:desc||""});
+  return "https://calendar.google.com/calendar/render?"+p.toString();
+}
+function calLinks(summary,d,desc){
+  const ics=icsWrap([icsEvent(summary,d,desc)]);
+  return `<div class="tcal"><span class="tcal-lab">Do kalendarza:</span>`
+    +`<a class="tcal-l" href="${esc(gcalHref(summary,d,desc))}" target="_blank" rel="noopener">Google</a>`
+    +`<a class="tcal-l" href="${esc(icsHref(ics))}" download="termin.ics">iCal (.ics)</a></div>`;
+}
+
+// --- kalkulator terminu liczonego OD ZDARZENIA (np. MDR 30 dni) ---
+const TERM_REL=[
+  {key:"mdr",  n:30, unit:"d",  label:"MDR — schemat podatkowy",                 desc:"30 dni, licząc od następnego dnia po zdarzeniu (np. wdrożenie / udostępnienie schematu)."},
+  {key:"crbr", n:14, unit:"dr", label:"CRBR — beneficjent rzeczywisty",          desc:"14 dni roboczych od wpisu/zmiany w KRS (soboty i święta nie liczą się do biegu)."},
+  {key:"pcc",  n:14, unit:"d",  label:"PCC-3 — np. pożyczka, umowa",             desc:"14 dni od powstania obowiązku podatkowego."},
+  {key:"vatr", n:7,  unit:"d",  label:"VAT-R — aktualizacja danych",             desc:"7 dni od zmiany danych objętych zgłoszeniem."},
+  {key:"zua",  n:7,  unit:"d",  label:"ZUS ZUA/ZZA — zgłoszenie do ubezpieczeń",  desc:"7 dni od powstania obowiązku ubezpieczeń."},
+  {key:"rud",  n:7,  unit:"d",  label:"RUD — umowa o dzieło",                     desc:"7 dni od zawarcia umowy."},
+  {key:"sdz2", n:6,  unit:"m",  label:"SD-Z2 — spadek/darowizna (zwolnienie)",    desc:"6 miesięcy od powstania obowiązku (nabycia)."},
+];
+function unitLab(n,u){ if(u==="m") return n+" "+(n===1?"miesiąc":"miesięcy"); if(u==="dr") return n+" dni roboczych"; return n+" dni"; }
+function relDeadline(rule, ev){
+  if(rule.unit==="m"){
+    const tm=ev.getMonth()+rule.n, ty=ev.getFullYear();
+    const last=new Date(ty,tm+1,0).getDate();
+    return tRoll(new Date(ty,tm,Math.min(ev.getDate(),last)));
+  }
+  if(rule.unit==="dr"){
+    const d=new Date(ev.getFullYear(),ev.getMonth(),ev.getDate()); let c=0;
+    while(c<rule.n){ d.setDate(d.getDate()+1); if(tWorking(d)) c++; }
+    return d;
+  }
+  return tRoll(new Date(ev.getFullYear(),ev.getMonth(),ev.getDate()+rule.n));
+}
+function renderTermCalc(){
+  const box=$("#termCalc"); if(!box) return;
+  if(!box.dataset.init){
+    box.dataset.init="1";
+    const opts=TERM_REL.map((r,i)=>`<option value="${i}">${esc(r.label)} (${unitLab(r.n,r.unit)})</option>`).join("");
+    const today=new Date(); const td=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+    box.innerHTML=`<div class="sci-head" style="margin-top:26px">Kalkulator terminu (od zdarzenia)</div>
+      <p class="livehint" style="margin:-4px 0 12px">Wybierz obowiązek i datę zdarzenia — policzę termin (z przesunięciem na dzień roboczy). Lista pełni też rolę ściągi.</p>
+      <div class="trc">
+        <select id="trcSel" class="conv-cur">${opts}</select>
+        <input id="trcDate" class="conv-amt" type="date" value="${td}" style="width:170px">
+      </div>
+      <div id="trcOut" class="trc-out"></div>`;
+    $("#trcSel").addEventListener("change",calcRel);
+    $("#trcDate").addEventListener("input",calcRel);
+  }
+  calcRel();
+}
+function calcRel(){
+  const sel=$("#trcSel"), di=$("#trcDate"), out=$("#trcOut"); if(!sel||!di||!out) return;
+  const rule=TERM_REL[+sel.value]; const parts=(di.value||"").split("-");
+  if(parts.length!==3){ out.innerHTML=""; return; }
+  const ev=new Date(+parts[0], +parts[1]-1, +parts[2]); if(isNaN(ev.getTime())){ out.innerHTML=""; return; }
+  const dl=relDeadline(rule, ev);
+  const today0=new Date(); today0.setHours(0,0,0,0);
+  const diff=Math.round((dl-today0)/86400000);
+  const when = diff<0?("minął "+(-diff)+" dni temu"):diff===0?"to dziś!":diff===1?"to jutro":("za "+diff+" dni");
+  const dstr=dl.toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const sumcal="Termin: "+rule.label.split(" — ")[0];
+  out.innerHTML=`<div class="trc-res ${diff<0?'trc-past':diff<=3?'trc-now':''}">Termin: <b>${esc(dstr)}</b> <span class="trc-when">(${esc(when)})</span></div>
+    <div class="trc-desc">${esc(rule.desc)}</div>
+    ${calLinks(sumcal, dl, rule.desc)}`;
+}
 function tCard(it){
   const dd=String(it.eff.getDate()).padStart(2,"0")+"."+String(it.eff.getMonth()+1).padStart(2,"0");
   const wd=T_DNI[it.eff.getDay()];
@@ -1841,6 +2036,7 @@ function tCard(it){
     <div class="ttitle">${esc(it.label)}</div>
     <div class="tmeta">${esc(meta)}</div>
     ${it.note?`<div class="tnote">${esc(it.note)}</div>`:""}
+    ${calLinks("Termin: "+it.label, it.eff, [it.okres,it.note].filter(Boolean).join(" · "))}
   </article>`;
 }
 function renderTermChips(){
@@ -1855,12 +2051,15 @@ function renderTermChips(){
 }
 function renderTerminy(){
   renderTermChips();
+  renderTermCalc();
   const box=$("#terminyList"); if(!box) return 0;
   const all=tUpcoming(45).filter(it=>!state.termOff.has(it.cat));
   const now=new Date();
   const head=`<div class="t-today">Dziś: <b>${now.toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</b> · najbliższe 45 dni</div>`;
   if(!all.length){ box.innerHTML=head+`<div class="live-status">Brak terminów w tym oknie dla wybranych kategorii (sprawdź chipy wyżej).</div>`; return 0; }
-  box.innerHTML=head+`<div class="tgrid">${all.map(tCard).join("")}</div>`;
+  const allIcs=icsWrap(all.map(it=>icsEvent("Termin: "+it.label, it.eff, [it.okres,it.note].filter(Boolean).join(" · "))));
+  const dlAll=`<a class="tdl-all" href="${esc(icsHref(allIcs))}" download="terminy-paragraf.ics">⤓ Dodaj wszystkie (${all.length}) do kalendarza (.ics)</a>`;
+  box.innerHTML=head+dlAll+`<div class="tgrid">${all.map(tCard).join("")}</div>`;
   return all.length;
 }
 
@@ -1876,21 +2075,90 @@ function renderNBP(tab){
   box.innerHTML=`<div class="nbp-head"><span>Kursy średnie NBP — tabela ${esc(tab.no||"")} z dnia ${esc(tab.effectiveDate||"")}</span><button class="livebtn" id="nbpRefresh">Odśwież</button></div>
     <div class="rategrid">${cards}</div>
     <p class="livehint" style="margin-top:8px">1 jednostka waluty = ile zł (kurs średni, tabela A). Do przeliczeń podatkowych zwykle bierze się kurs średni z <b>ostatniego dnia roboczego poprzedzającego</b> dzień uzyskania przychodu / poniesienia kosztu.</p>`;
-  const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpData=null; state.nbpLoading=false; loadNBP(); };
+  const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpData=null; state.nbpLoading=false; loadNBP(true); };
 }
-async function loadNBP(){
+async function loadNBP(fresh){
   const box=$("#nbpBox"); if(!box||state.nbpLoading) return;
   state.nbpLoading=true; box.innerHTML=`<div class="live-status">Pobieram kursy z NBP…</div>`;
-  const fail=(msg)=>{ state.nbpLoading=false; box.innerHTML=`<div class="live-status">${msg} <button class="livebtn" id="nbpRefresh" style="margin-left:6px">Spróbuj ponownie</button></div>`; const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpLoading=false; loadNBP(); }; };
+  const fail=(msg)=>{ state.nbpLoading=false; box.innerHTML=`<div class="live-status">${msg} <button class="livebtn" id="nbpRefresh" style="margin-left:6px">Spróbuj ponownie</button></div>`; const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpLoading=false; loadNBP(true); }; };
   try{
-    const data=await getJSON("https://api.nbp.pl/api/exchangerates/tables/A/?format=json");
+    const data=await getJSON("https://api.nbp.pl/api/exchangerates/tables/A/?format=json", fresh);
     const tab=Array.isArray(data)?data[0]:((data&&data.rates)?data:null);
     state.nbpLoading=false;
     if(!tab||!tab.rates){ fail("Nie udało się pobrać kursów NBP (serwis nie odpowiedział)."); return; }
-    state.nbpData=tab; renderNBP(tab);
+    state.nbpData=tab; renderNBP(tab); renderConverter(tab);
   }catch(e){ fail("Błąd pobierania kursów NBP."); }
 }
-function renderWskazniki(){
+// ---- KURSY: przelicznik walut (po kursie srednim NBP) ----
+function renderConverter(tab){
+  const box=$("#kursyCalc"); if(!box) return;
+  const rates=(tab&&tab.rates)?tab.rates.slice():[];
+  if(!rates.length){ box.innerHTML=""; return; }
+  rates.sort((a,b)=>{ const ia=NBP_MAIN.indexOf(a.code), ib=NBP_MAIN.indexOf(b.code);
+    if(ia>=0||ib>=0){ if(ia<0)return 1; if(ib<0)return -1; return ia-ib; } return a.code<b.code?-1:1; });
+  const opts=rates.map(r=>`<option value="${esc(r.code)}" data-mid="${r.mid}">${esc(r.code)} — ${esc(r.currency)}</option>`).join("");
+  box.innerHTML=`<div class="conv-head">Przelicznik walut</div>
+    <div class="conv">
+      <input id="convAmt" class="conv-amt" type="number" inputmode="decimal" value="100" min="0" step="any">
+      <select id="convCur" class="conv-cur">${opts}</select>
+      <span class="conv-eq">=</span>
+      <span id="convOut" class="conv-out">—</span>
+      <button class="conv-swap" id="convSwap" title="Odwróć kierunek">⇄</button>
+    </div>
+    <p class="livehint" id="convNote" style="margin-top:8px">Po kursie średnim NBP (tabela A z dnia ${esc(tab.effectiveDate||"")}). Kierunek: waluta → złoty.</p>`;
+  let toPLN=true; // true: waluta->PLN, false: PLN->waluta
+  const amt=$("#convAmt"), cur=$("#convCur"), out=$("#convOut"), note=$("#convNote"), swap=$("#convSwap");
+  function calc(){
+    const opt=cur.options[cur.selectedIndex]; const mid=opt?parseFloat(opt.dataset.mid):NaN;
+    const a=parseFloat((amt.value||"").replace(",", ".")); 
+    if(!isFinite(mid)||!isFinite(a)){ out.textContent="—"; return; }
+    if(toPLN){ const v=a*mid; out.textContent=v.toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł"; }
+    else { const v=a/mid; out.textContent=v.toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur.value; }
+  }
+  amt.addEventListener("input",calc); cur.addEventListener("change",calc);
+  swap.onclick=()=>{ toPLN=!toPLN; note.textContent="Po kursie średnim NBP (tabela A z dnia "+(tab.effectiveDate||"")+"). Kierunek: "+(toPLN?"waluta → złoty":"złoty → waluta")+"."; calc(); };
+  calc();
+}
+function renderKursy(){
+  if(state.nbpData){ renderNBP(state.nbpData); renderConverter(state.nbpData); }
+  else loadNBP();
+  return state.nbpData?state.nbpData.rates.length:0;
+}
+
+// ---- STAWKI: sciagawka + tabela VAT (sprzedaz transgraniczna) ----
+const VAT_TABLE=[
+  {from:"Polska", rows:[
+    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"23%", note:"książki 5%"},
+    {to:"Firmy spoza UE (eksport)", rate:"0%"},
+    {to:"Firmy z UE (WDT)", rate:"0%"},
+    {to:"Osoby fizyczne spoza UE", rate:"0%"},
+    {to:"Osoby fizyczne z UE (poza Polską)", rate:"23% lub stawka kraju odbiorcy", note:"zależnie od progu OSS"},
+  ]},
+  {from:"Szwajcaria", rows:[
+    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"8,1%"},
+    {to:"Firmy spoza UE", rate:"0%"},
+    {to:"Firmy z UE", rate:"0%"},
+    {to:"Osoby fizyczne z UE i spoza UE", rate:"0%"},
+  ]},
+  {from:"Wielka Brytania (UK)", rows:[
+    {to:"Sprzedaż krajowa (firmy lub osoby fizyczne)", rate:"20,0%"},
+    {to:"Firmy spoza UE", rate:"0%"},
+    {to:"Firmy z UE", rate:"0%"},
+    {to:"Osoby fizyczne z UE i spoza UE", rate:"0%"},
+  ]},
+];
+function renderVAT(){
+  const box=$("#vatBox"); if(!box || box.dataset.done) return;
+  box.dataset.done="1";
+  const groups=VAT_TABLE.map(g=>{
+    const rows=g.rows.map(r=>`<tr><td class="vt-to">${esc(r.to)}</td><td class="vt-rate">${esc(r.rate)}${r.note?` <span class="vt-note">(${esc(r.note)})</span>`:""}</td></tr>`).join("");
+    return `<div class="vt-group"><div class="vt-from">Sprzedaż z: <b>${esc(g.from)}</b></div>
+      <table class="vt"><thead><tr><th>Do kogo</th><th>Stawka VAT</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }).join("");
+  box.innerHTML=`<div class="sci-head" style="margin-top:26px">Stawki VAT — sprzedaż transgraniczna</div>${groups}
+    <p class="livehint" style="margin-top:6px">Orientacyjnie, według Twojej tabeli. Faktyczna stawka zależy od statusu nabywcy, miejsca opodatkowania i progów (OSS, eksport, WDT) — przy wątpliwości potwierdź z przepisami.</p>`;
+}
+function renderStawki(){
   const sb=$("#sciagawkaBox");
   if(sb && !sb.dataset.done){
     sb.dataset.done="1";
@@ -1904,19 +2172,78 @@ function renderWskazniki(){
     </div>
     <p class="livehint" style="margin-top:8px">⚠ Wartości zmieniają się co roku (zwłaszcza kwoty ZUS i progi) — przed użyciem sprawdź aktualność u źródła. To skrót poglądowy, nie porada podatkowa.</p>`;
   }
-  if(state.nbpData) renderNBP(state.nbpData); else loadNBP();
-  return state.nbpData?state.nbpData.rates.length:0;
+  renderVAT();
+  return 0;
+}
+
+// ===== KALKULATOR obciazen JDG (liniowy / ryczalt / skala) =====
+// Stale 2026 i formuly odwzorowane 1:1 ze sprawdzonego arkusza.
+const HEALTH_MIN_2026 = 5190.48;   // minimalna roczna skladka zdrowotna (liniowy/skala)
+function plPLN(v){ return (isFinite(v)?v:0).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł"; }
+function plPct(v){ return (v*100).toLocaleString("pl-PL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%"; }
+function kalkNum(id){ const el=$(id); if(!el) return 0; const v=parseFloat((el.value||"").replace(",", ".")); return isFinite(v)?v:0; }
+function calcForms(P,K,ZUS,r){
+  const D=P-K, POD=D-ZUS;
+  // LINIOWY 19%
+  const zdrowLin=Math.max(0.049*(D-ZUS), HEALTH_MIN_2026);
+  const dedLin=Math.min(zdrowLin,14100);
+  const pitLin=Math.max(Math.round((P-K-ZUS-dedLin)*0.19),0);
+  const danLin=(POD-dedLin)>1000000?((POD-dedLin-1000000)*0.04):0;
+  const sumaLin=pitLin+ZUS+zdrowLin+danLin;
+  // RYCZALT (jedna stawka na calosc przychodu)
+  const ryczOK = P<=8517200;
+  const zdrowR=(P-ZUS+1661.64>300000?1495.04:(P-ZUS+1661.64>60000?830.58:498.35))*12;
+  const zusDed=Math.max(ZUS-1661.64,0);
+  const pitR=Math.max((P-zusDed-0.5*zdrowR)*r,0);
+  const sumaR=pitR+zdrowR+ZUS;
+  // SKALA
+  const zdrowS=Math.max(0.09*(D-ZUS), HEALTH_MIN_2026);
+  const pitS=Math.max((POD>0?(Math.min(POD,120000)*0.12+Math.max(POD-120000,0)*0.32-3600):0),0);
+  const danS=POD>1000000?((POD-1000000)*0.04):0;
+  const sumaS=pitS+ZUS+zdrowS+danS;
+  const F=(pit,zdrow,danina,suma)=>({pit,zdrow,zus:ZUS,danina,suma,netto:D-suma,stopa:D?suma/D:null});
+  return { D, lin:F(pitLin,zdrowLin,danLin,sumaLin), rycz:ryczOK?F(pitR,zdrowR,0,sumaR):null, sk:F(pitS,zdrowS,danS,sumaS) };
+}
+function renderKalk(){
+  const box=$("#kalkResults"); if(!box) return 0;
+  if(!box.dataset.wired){
+    box.dataset.wired="1";
+    ["#kalkP","#kalkK","#kalkZ"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",renderKalk); });
+    const rs=$("#kalkR"); if(rs) rs.addEventListener("change",renderKalk);
+  }
+  const r=parseFloat(($("#kalkR")||{}).value||"0.085");
+  const res=calcForms(kalkNum("#kalkP"),kalkNum("#kalkK"),kalkNum("#kalkZ"),r);
+  const forms=[["Liniowy 19%",res.lin],["Ryczałt "+plPct(r),res.rycz],["Skala podatkowa",res.sk]];
+  let best=null; forms.forEach(([_,f])=>{ if(f && (best===null||f.suma<best)) best=f.suma; });
+  const card=(name,f)=>{
+    if(!f) return `<div class="kc kc-off"><div class="kc-h">${esc(name)}</div><div class="kc-na">Niedostępny — przychód powyżej limitu 2 mln EUR.</div></div>`;
+    const isBest=best!==null && Math.abs(f.suma-best)<0.005;
+    const rows=[["PIT",f.pit],["Składka zdrowotna",f.zdrow],["ZUS",f.zus]];
+    if(f.danina>0) rows.push(["Danina solidarn.",f.danina]);
+    const rh=rows.map(x=>`<div class="kr"><span>${x[0]}</span><b>${plPLN(x[1])}</b></div>`).join("");
+    return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">najkorzystniej</div>':''}
+      <div class="kc-h">${esc(name)}</div>${rh}
+      <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+      <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+      <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.netto)}</b></div>
+      <div class="kr"><span>Zostaje (mies.)</span><b>${plPLN(f.netto/12)}</b></div>
+    </div>`;
+  };
+  box.innerHTML=`<div class="kc-dochod">Dochód (przychód − koszty): <b>${plPLN(res.D)}</b></div>`
+    +`<div class="kgrid">${forms.map(f=>card(f[0],f[1])).join("")}</div>`;
+  return 0;
 }
 
 function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
   let c;
-  if(state.tab==="legis") c=u;
-  else if(state.tab==="rcl") c=r;
+  if(state.tab==="legis") c=(state.legisSub==="proc"?r:u);
   else if(state.tab==="moje") c=mj;
   else if(state.tab==="terminy") c=renderTerminy();
-  else if(state.tab==="wskazniki") c=renderWskazniki();
+  else if(state.tab==="kursy") c=renderKursy();
+  else if(state.tab==="stawki") c=renderStawki();
+  else if(state.tab==="kalk") c=renderKalk();
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
   else c=n;
@@ -1924,17 +2251,26 @@ function render(){
   syncAddBtns();
 }
 
+function applyLegisSub(){
+  if(!state.legisSub) state.legisSub="proc";
+  const inLegis = state.tab==="legis";
+  const sb=$("#legisSubBar"); if(sb) sb.hidden = !inLegis;
+  $("#legisView").hidden = !(inLegis && state.legisSub==="wchodza");
+  $("#rclView").hidden   = !(inLegis && state.legisSub==="proc");
+  document.querySelectorAll("[data-lsub]").forEach(b=>b.classList.toggle("on", b.dataset.lsub===state.legisSub));
+}
 function switchTab(t){
   state.tab=t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#newsView").hidden  = t!=="news";
-  $("#legisView").hidden = t!=="legis";
-  $("#rclView").hidden   = t!=="rcl";
   $("#wyrokiView").hidden= t!=="wyroki";
   $("#kisView").hidden   = t!=="kis";
   $("#mojeView").hidden  = t!=="moje";
   $("#terminyView").hidden = t!=="terminy";
-  $("#wskazView").hidden = t!=="wskazniki";
+  $("#kursyView").hidden = t!=="kursy";
+  $("#stawkiView").hidden = t!=="stawki";
+  $("#kalkView").hidden = t!=="kalk";
+  applyLegisSub();   // steruje #legisSubBar + #legisView + #rclView
   render();
 }
 
@@ -1958,6 +2294,7 @@ function switchTab(t){
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.querySelectorAll("[data-lsub]").forEach(b=>b.onclick=()=>{ state.legisSub=b.dataset.lsub; applyLegisSub(); render(); });
   // delegacja: „+" dodaj / „✓" usuń (na kartach) oraz usuń w „Moje"
   document.body.addEventListener("click", e=>{
     const add=e.target.closest(".addbtn[data-item]");
