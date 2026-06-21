@@ -1115,6 +1115,16 @@ TEMPLATE = r'''<!DOCTYPE html>
     background:var(--accent);color:#f3e9df;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
   .nb-copy:hover{filter:brightness(1.08)}
   .wyrok-snip{margin:7px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink-soft)}
+  .wyrok-snip mark{background:rgba(176,124,42,.28);color:var(--ink);border-radius:2px;padding:0 1px}
+  .wyr-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .wf{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-faint);font-weight:600}
+  .wf input,.wf select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;
+    font-family:var(--sans);background:var(--surface);color:var(--ink)}
+  .wyr-ct{display:inline-block;color:#f3e9df;font-size:10px;font-weight:700;border-radius:5px;
+    padding:1px 6px;letter-spacing:.02em;vertical-align:middle}
+  .wyr-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px 0 4px;
+    font-size:12.5px;color:var(--ink-soft)}
+  .wyr-pager .livebtn[disabled]{opacity:.4;cursor:default}
   .kis-launch{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.55;color:var(--ink)}
   .kis-launch p{margin:0 0 8px}
   .kis-launch p:last-child{margin:0}
@@ -1224,6 +1234,12 @@ TEMPLATE = r'''<!DOCTYPE html>
           <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: VAT, ulga, koszty, zwolnienie…  (Enter)" autocomplete="off">
           <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen">Szukaj</button>
         </div>
+        <div class="wyr-filters" id="wyrFilters">
+          <label class="wf"><span>Od</span><input id="wyrFrom" type="date"></label>
+          <label class="wf"><span>Do</span><input id="wyrTo" type="date"></label>
+          <label class="wf"><span>Typ</span><select id="wyrType"><option value="">wszystkie</option><option value="SENTENCE">wyrok</option><option value="DECISION">postanowienie</option><option value="RESOLUTION">uchwała</option></select></label>
+          <label class="wf"><span>Sortuj</span><select id="wyrSort"><option value="DESC">od najnowszych</option><option value="ASC">od najstarszych</option></select></label>
+        </div>
         <p class="livehint"><b>SAOS</b> ma API, więc wyniki pokazuję tu w aplikacji. Obejmuje sądy powszechne, SN, TK, KIO <b>oraz sądy administracyjne (NSA/WSA)</b> — czyli orzeczenia podatkowe też się pojawiają, choć jego baza administracyjna bywa mniej kompletna i aktualna niż CBOSA. Po najpełniejsze i najnowsze orzecznictwo podatkowe przełącz na <b>CBOSA</b> — nie ma API i blokuje automatyczny dostęp, więc dla niej kopiuję frazę i otwieram jej wyszukiwarkę.</p>
       </div>
       <div id="wyrokiResults"></div>
@@ -1271,6 +1287,8 @@ TEMPLATE = r'''<!DOCTYPE html>
     </section>
 
     <section id="kalkView" hidden>
+      <div class="subtabs" data-subbar="kalk"></div>
+      <div id="kalkJdg">
       <div class="controls">
         <div class="kalk-inputs">
           <label class="kin"><span>Przychód netto / rok</span><input id="kalkP" type="number" inputmode="decimal" value="300000" min="0" step="any"></label>
@@ -1298,6 +1316,19 @@ TEMPLATE = r'''<!DOCTYPE html>
         <div id="kalkResults"></div>
         <p class="livehint" style="margin-top:10px">Składki <b>społeczne</b> liczone automatycznie z wybranego schematu ZUS (stawki 2026), składka <b>zdrowotna</b> liczona sama wg formy (skala 9% / liniowy 4,9% / ryczałt wg progu przychodu). Chorobowe dobrowolne — domyślnie wyłączone. Orientacyjnie, dla jednoosobowej działalności — nie jest to porada podatkowa.</p>
       </div>
+      </div>
+      <div id="kalkSpzoo">
+      <div class="controls">
+        <div class="kalk-inputs">
+          <label class="kin"><span>Przychód spółki / rok</span><input id="spP" type="number" inputmode="decimal" value="500000" min="0" step="any"></label>
+          <label class="kin"><span>Koszty / rok</span><input id="spK" type="number" inputmode="decimal" value="100000" min="0" step="any"></label>
+          <label class="kin"><span>Wynagrodzenie zarządu — powołanie / rok</span><input id="spPow" type="number" inputmode="decimal" value="0" min="0" step="any"></label>
+          <label class="kin kin-chk"><input id="spMaly" type="checkbox" checked><span>Mały podatnik (CIT 9% / estoński 10%)</span></label>
+        </div>
+        <div id="spzooResults"></div>
+        <p class="livehint" style="margin-top:10px">Porównanie przy <b>pełnej wypłacie zysku</b>. „Klasyczna" = CIT (9%/19%) + 19% PIT od dywidendy (podwójne opodatkowanie). „Estoński CIT" = brak CIT do czasu wypłaty, a przy wypłacie CIT 10%/20% + obniżony PIT od dywidendy (łącznie ok. 20%/25%). Wynagrodzenie z powołania zmniejsza zysk i jest opodatkowane PIT 12% + 9% zdrowotnej (bez ZUS społecznego). Orientacyjnie — nie jest to porada podatkowa.</p>
+      </div>
+      </div>
     </section>
 
     <footer>
@@ -1311,7 +1342,7 @@ const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
 const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(),
-  sub:{ legis:"proc", terminy:"lista", kursy:"kursy", stawki:"sciaga" }, sciaga:[] };
+  sub:{ legis:"proc", terminy:"lista", kursy:"kursy", stawki:"sciaga", kalk:"jdg" }, sciaga:[] };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
@@ -1688,31 +1719,77 @@ async function searchRCL(){
   box.innerHTML=`<div class="live-sec-head">Projekty rządowe (RCL) — „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
 }
 
-// Wyroki / orzeczenia — wyszukiwanie po hasle w bazie SAOS (czyste API JSON)
+// Wyroki / orzeczenia — wyszukiwarka w bazie SAOS (czyste API JSON, z filtrami i stronicowaniem)
+const WYR_CT={ADMINISTRATIVE:["NSA/WSA","#2a6a7a"], SUPREME:["SN","#6b4a8a"], COMMON:["sąd powszechny","#4a4a4a"], CONSTITUTIONAL_TRIBUNAL:["TK","#8a2e2a"], NATIONAL_APPEAL_CHAMBER:["KIO","#8a5a2e"]};
+function wyrSnippet(raw){
+  if(!raw) return "";
+  let t=String(raw).replace(/\s+/g," ").replace(/<(?!\/?em\b)[^>]*>/gi,"").trim();
+  if(t.length>340){ t=t.slice(0,340).replace(/<\/?e?m?$/i,"")+"…"; }
+  const o=(t.match(/<em>/gi)||[]).length, c=(t.match(/<\/em>/gi)||[]).length;
+  if(o>c) t+="</em>".repeat(o-c);
+  return esc(t).replace(/&lt;em&gt;/gi,'<mark>').replace(/&lt;\/em&gt;/gi,'</mark>');
+}
 function wyrokCard(it){
-  const court = (it.division && it.division.court && it.division.court.name) || it.courtType || "Sąd";
-  const sig = (it.courtCases && it.courtCases[0] && it.courtCases[0].caseNumber) || "";
-  const date = it.judgmentDate || "";
-  const map = {SENTENCE:"wyrok", DECISION:"postanowienie", RESOLUTION:"uchwała", REGULATION:"zarządzenie", REASONS:"uzasadnienie"};
-  const kind = map[it.judgmentType] || "orzeczenie";
-  let snip = (it.textContent||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
-  if(snip.length>240) snip = snip.slice(0,240)+"…";
-  const link = "https://www.saos.org.pl/judgments/"+it.id;
-  const title = (sig ? sig+" — " : "") + court;
-  const mini = {type:"wyrok", title:title, link:link, src:kind, stage:"", step:0};
-  return `<article class="lcard" style="--ccol:#3a5c8a">
-    <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(kind)}${date?" · "+esc(date):""}</span><span class="lright">${addbtn(mini)}</span></div>
-    <a class="ltitle" href="${esc(link)}" target="_blank" rel="noopener">${esc(title)}</a>
-    ${tagsHTML(taxTags(title+" "+(snip||"")),2)}
-    ${snip?`<p class="wyrok-snip">${esc(snip)}</p>`:""}
+  const court=(it.division && it.division.court && it.division.court.name) || "";
+  const sig=(it.courtCases && it.courtCases[0] && it.courtCases[0].caseNumber) || "";
+  const date=it.judgmentDate || "";
+  const map={SENTENCE:"wyrok", DECISION:"postanowienie", RESOLUTION:"uchwała", REGULATION:"zarządzenie", REASONS:"uzasadnienie"};
+  const kind=map[it.judgmentType] || "orzeczenie";
+  const ct=WYR_CT[it.courtType]||["sąd","#777"];
+  const snip=wyrSnippet(it.textContent||"");
+  const snipPlain=(it.textContent||"").replace(/<[^>]*>/g," ");
+  const link="https://www.saos.org.pl/judgments/"+it.id;
+  const title=(sig ? sig+(court?" — ":"") : "") + court;
+  const mini={type:"wyrok", title:title||kind, link:link, src:kind, stage:"", step:0};
+  return `<article class="lcard" style="--ccol:${ct[1]}">
+    <div class="lhead"><span class="lsrc"><span class="wyr-ct" style="background:${ct[1]}">${esc(ct[0])}</span> ${esc(kind)}${date?" · "+esc(date):""}</span><span class="lright">${addbtn(mini)}</span></div>
+    <a class="ltitle" href="${esc(link)}" target="_blank" rel="noopener">${esc(title||kind)}</a>
+    ${tagsHTML(taxTags(title+" "+snipPlain),2)}
+    ${snip?`<p class="wyrok-snip">${snip}</p>`:""}
   </article>`;
 }
+let wyrCtx=null;
+function wyrUrl(c){
+  let u=`https://www.saos.org.pl/api/search/judgments?pageSize=20&pageNumber=${c.page}&sortingField=JUDGMENT_DATE&sortingDirection=${c.sort||"DESC"}`;
+  if(c.q) u+="&all="+encodeURIComponent(c.q);
+  if(c.from) u+="&judgmentDateFrom="+c.from;
+  if(c.to) u+="&judgmentDateTo="+c.to;
+  if(c.jtype) u+="&judgmentTypes="+c.jtype;
+  return u;
+}
+async function wyrFetch(){
+  const box=$("#wyrokiResults"), btn=$("#wyrokiBtn"), c=wyrCtx; if(!c) return;
+  if(btn) btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam orzeczeń w SAOS…</div>`;
+  let items=[], total=null;
+  try{
+    const data=await getJSON(wyrUrl(c));
+    if(data){ if(Array.isArray(data.items)) items=data.items; if(data.info && typeof data.info.totalResults==="number") total=data.info.totalResults; }
+  }catch(e){}
+  if(btn) btn.disabled=false;
+  if(!items.length){
+    box.innerHTML=`<div class="live-status">${c.page>0?"Brak dalszych wyników — wróć na poprzednią stronę.":'Nic nie znalazłem w SAOS dla tych kryteriów. SAOS obejmuje też sądy administracyjne, ale jego baza podatkowa bywa niepełna — spróbuj innych słów lub przełącz na <b>CBOSA</b> (pełniejsza baza NSA/WSA). Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.'}</div>`;
+    return;
+  }
+  const totalPages = total!=null ? Math.max(Math.ceil(total/20),1) : null;
+  const desc = (c.q?'„'+esc(c.q)+'"':"filtry") + (total!=null?" · "+total+" wyników":"");
+  const head=`<div class="live-sec-head">Orzeczenia (SAOS) — ${desc}</div>`;
+  const prevOff = c.page<=0;
+  const nextOff = totalPages!=null ? (c.page+1>=totalPages) : (items.length<20);
+  const pager=`<div class="wyr-pager">
+    <button class="livebtn" ${prevOff?"disabled":""} data-wpg="-1">‹ Poprzednia</button>
+    <span>strona ${c.page+1}${totalPages?" / "+totalPages:""}</span>
+    <button class="livebtn" ${nextOff?"disabled":""} data-wpg="1">Następna ›</button>
+  </div>`;
+  box.innerHTML=head+`<div class="lgrid">${items.map(wyrokCard).join("")}</div>`+pager;
+  box.querySelectorAll("[data-wpg]").forEach(b=>b.onclick=()=>{ wyrCtx.page=Math.max(wyrCtx.page+(+b.dataset.wpg),0); wyrFetch(); });
+  syncAddBtns();
+}
 async function searchWyroki(){
+  const box=$("#wyrokiResults");
   const q=($("#searchW").value||"").trim();
-  const box=$("#wyrokiResults"), btn=$("#wyrokiBtn");
-  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
   // CBOSA: brak API + blokuje boty -> kopiujemy fraze i otwieramy jej wyszukiwarke.
   if(state.wyrokiSrc==="cbosa"){
+    if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
     let copied=false;
     try{ navigator.clipboard.writeText(q); copied=true; }catch(_){}
     try{ window.open("https://orzeczenia.nsa.gov.pl/cbo/query", "_blank", "noopener"); }catch(_){}
@@ -1722,20 +1799,10 @@ async function searchWyroki(){
     </div>`;
     return;
   }
-  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam orzeczeń w SAOS…</div>`;
-  let items=[];
-  try{
-    const url=`https://www.saos.org.pl/api/search/judgments?pageSize=20&pageNumber=0&all=${encodeURIComponent(q)}&sortingField=JUDGMENT_DATE&sortingDirection=DESC`;
-    const data=await getJSON(url);
-    if(data && Array.isArray(data.items)) items=data.items;
-  }catch(e){}
-  btn.disabled=false;
-  if(!items.length){
-    box.innerHTML=`<div class="live-status">Nic nie znalazłem w SAOS dla „${esc(q)}". SAOS obejmuje też sądy administracyjne, ale jego baza podatkowa bywa niepełna — spróbuj innych słów albo przełącz na <b>CBOSA</b> (pełniejsza baza NSA/WSA). Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.</div>`;
-    return;
-  }
-  box.innerHTML=`<div class="live-sec-head">Orzeczenia (SAOS) — „${esc(q)}" (${items.length})</div><div class="lgrid">${items.map(wyrokCard).join("")}</div>`;
-  syncAddBtns();
+  const from=($("#wyrFrom")||{}).value||"", to=($("#wyrTo")||{}).value||"", jtype=($("#wyrType")||{}).value||"", sort=($("#wyrSort")||{}).value||"DESC";
+  if(q.length<2 && !from && !to && !jtype){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki albo ustaw filtr (data/typ).</div>`; return; }
+  wyrCtx={q, from, to, jtype, sort, page:0};
+  wyrFetch();
 }
 
 // Interpretacje KIS — brak publicznego API, wiec kopiujemy fraze i otwieramy oficjalna wyszukiwarke
@@ -2349,6 +2416,50 @@ function renderKalk(){
   return 0;
 }
 
+// --- kalkulator sp. z o.o.: klasyczna (CIT) vs estonski CIT (wzory z arkusza) ---
+function calcSpzoo(P,K,powolanie,maly){
+  const zysk=Math.max(P-K,0);
+  const zyskPoPow=Math.max(zysk-powolanie,0);
+  // powolanie: PIT 12% (po odliczeniu 3000+30000) + 9% zdrowotnej od calosci
+  const pitPow = Math.max(0,(powolanie-3000-30000)*0.12) + 0.09*powolanie;
+  // KLASYCZNA: CIT od zysku, potem 19% PIT od dywidendy (podwojne opodatkowanie)
+  const citK = zyskPoPow*(maly?0.09:0.19);
+  const pitDywK = (zyskPoPow-citK)*0.19;
+  const sumaK = citK+pitDywK+pitPow;
+  // ESTONSKI: CIT 10/20% przy wyplacie, PIT 19% od dywidendy minus 90/70% CIT
+  const citE = zyskPoPow*(maly?0.10:0.20);
+  const pitDywE = Math.max(zyskPoPow*0.19 - (maly?citE*0.9:citE*0.7), 0);
+  const sumaE = citE+pitDywE+pitPow;
+  const mk=(cit,pitDyw,suma)=>({cit,pitDyw,pitPow,suma,netto:zysk-suma,stopa:zysk?suma/zysk:null});
+  return { zysk, klas:mk(citK,pitDywK,sumaK), est:mk(citE,pitDywE,sumaE) };
+}
+function renderSpzoo(){
+  const box=$("#spzooResults"); if(!box) return;
+  if(!box.dataset.wired){
+    box.dataset.wired="1";
+    ["#spP","#spK","#spPow"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",renderSpzoo); });
+    const m=$("#spMaly"); if(m) m.addEventListener("change",renderSpzoo);
+  }
+  const P=kalkNum("#spP"),K=kalkNum("#spK"),pow=kalkNum("#spPow"),maly=!!(($("#spMaly")||{}).checked);
+  const res=calcSpzoo(P,K,pow,maly);
+  const forms=[["Klasyczna (CIT + 19% dywidenda)",res.klas],["Estoński CIT",res.est]];
+  let best=null; forms.forEach(([_,f])=>{ if(best===null||f.suma<best) best=f.suma; });
+  const card=(name,f)=>{
+    const isBest=best!==null && Math.abs(f.suma-best)<0.005;
+    const rows=[["CIT",f.cit],["PIT od dywidendy",f.pitDyw]];
+    if(f.pitPow>0) rows.push(["PIT + zdrow. (powołanie)",f.pitPow]);
+    const rh=rows.map(x=>`<div class="kr"><span>${x[0]}</span><b>${plPLN(x[1])}</b></div>`).join("");
+    return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">korzystniej</div>':''}
+      <div class="kc-h">${esc(name)}</div>${rh}
+      <div class="kr kr-sum"><span>Suma obciążeń</span><b>${plPLN(f.suma)}</b></div>
+      <div class="kr"><span>Efektywna stopa</span><b>${f.stopa==null?"n/d":plPct(f.stopa)}</b></div>
+      <div class="kr kr-net"><span>Zostaje (rok)</span><b>${plPLN(f.netto)}</b></div>
+    </div>`;
+  };
+  box.innerHTML=`<div class="kc-dochod">Zysk spółki (przychód − koszty): <b>${plPLN(res.zysk)}</b> · przy pełnej wypłacie zysku</div>`
+    +`<div class="kgrid">${forms.map(f=>card(f[0],f[1])).join("")}</div>`;
+}
+
 function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
@@ -2358,7 +2469,7 @@ function render(){
   else if(state.tab==="terminy") c=renderTerminy();
   else if(state.tab==="kursy") c=renderKursy();
   else if(state.tab==="stawki") c=renderStawki();
-  else if(state.tab==="kalk") c=renderKalk();
+  else if(state.tab==="kalk"){ renderKalk(); renderSpzoo(); c=0; }
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
   else c=n;
@@ -2372,6 +2483,7 @@ const SUBTABS = {
   terminy: [["lista","Terminy","#terminyMain"], ["kalk","Kalkulator terminu","#termCalcWrap"]],
   kursy:   [["kursy","Kursy walut","#kursyRates"], ["kalk","Przelicznik walut","#kursyConv"]],
   stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT zagranica","#stawkiVat"]],
+  kalk:    [["jdg","JDG","#kalkJdg"], ["spzoo","Spółka z o.o.","#kalkSpzoo"]],
 };
 function fillSubBars(){
   Object.keys(SUBTABS).forEach(tab=>{
@@ -2408,6 +2520,7 @@ function switchTab(t){
   if(t==="terminy") applySub("terminy");
   if(t==="kursy") applySub("kursy");
   if(t==="stawki") applySub("stawki");
+  if(t==="kalk") applySub("kalk");
   render();
 }
 
@@ -2426,8 +2539,10 @@ function switchTab(t){
   document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(b=>b.onclick=()=>{
     state.wyrokiSrc=b.dataset.src;
     document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(x=>x.classList.toggle("on",x===b));
+    const f=$("#wyrFilters"); if(f) f.style.display=(state.wyrokiSrc==="cbosa")?"none":"";
     const inp=$("#searchW"); if(inp&&inp.value.trim().length>=2) searchWyroki();
   });
+  ["#wyrFrom","#wyrTo","#wyrType","#wyrSort"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",()=>{ if(wyrCtx && state.wyrokiSrc!=="cbosa") searchWyroki(); }); });
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
