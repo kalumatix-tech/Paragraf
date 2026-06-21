@@ -40,9 +40,12 @@ FEEDS = [
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
 
-    # --- Interpretacje podatkowe KIS / Min. Finansow (czysto podatkowe) ---
-    {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
-     "url": "https://interpretacje-podatkowe.org/feed"},
+    # --- Interpretacje podatkowe KIS / Min. Finansow ---
+    # UWAGA: interpretacje-podatkowe.org zostalo zawieszone ("account suspended"),
+    # wiec kanal nie dziala - wylaczony. Interpretacje obsluguje teraz zakladka
+    # "Interpretacje" (launcher do oficjalnej wyszukiwarki EUREKA).
+    # {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
+    #  "url": "https://interpretacje-podatkowe.org/feed"},
 
     # --- Serwis specjalistyczny (na próbę - sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
@@ -490,6 +493,8 @@ def _rcl_status(page_text):
     if not page_text:
         return None
     low = page_text.lower()
+    if re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low:
+        return "became_law"      # zakonczony: stal sie ustawa / dolaczony do innego projektu
     if "na stronach sejmu" in low or "dalszy ciąg procesu legislacyjnego" in low:
         return "left"
     if re.search(r"status projektu:\s*zamkn", low):
@@ -915,6 +920,8 @@ TEMPLATE = r'''<!DOCTYPE html>
     border-radius:6px;padding:6px 9px;line-height:1.4}
   .lcard.is-closed{opacity:.62}
   .lcard.is-left{border-left-color:#1d3a6b}
+  .lcard.is-done{border-left-color:#1b6e4f}
+  .lnote-done{color:#0f5c3a;background:rgba(27,110,79,.08);font-weight:600}
   /* rozwijana karta etapów rządowych (RCL) */
   .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
@@ -958,6 +965,13 @@ TEMPLATE = r'''<!DOCTYPE html>
   .nb-copy{margin-top:9px;height:30px;padding:0 14px;border-radius:8px;border:1px solid var(--accent);
     background:var(--accent);color:#f3e9df;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
   .nb-copy:hover{filter:brightness(1.08)}
+  .wyrok-snip{margin:7px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink-soft)}
+  .kis-launch{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.55;color:var(--ink)}
+  .kis-launch p{margin:0 0 8px}
+  .kis-launch p:last-child{margin:0}
+  .kis-alt{font-size:12.5px;color:var(--ink-soft)}
+  .kis-alt a{color:var(--accent);text-decoration:none;font-weight:600}
+  .kis-alt a:hover{text-decoration:underline}
   .tabbadge{display:none;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);
     color:#f3e9df;font-size:10px;font-weight:700;line-height:17px;text-align:center;margin-left:6px;vertical-align:middle}
   .tabbadge.show{display:inline-block}
@@ -993,6 +1007,8 @@ TEMPLATE = r'''<!DOCTYPE html>
       <button class="tab on" data-tab="news">Wiadomości</button>
       <button class="tab" data-tab="legis">Ustawy</button>
       <button class="tab" data-tab="rcl">RCL</button>
+      <button class="tab" data-tab="wyroki">Wyroki</button>
+      <button class="tab" data-tab="kis">Interpretacje</button>
       <button class="tab" data-tab="moje">Moje<span class="tabbadge" id="mojeBadge"></span></button>
     </nav>
 
@@ -1031,6 +1047,28 @@ TEMPLATE = r'''<!DOCTYPE html>
       <section id="rclList"></section>
     </section>
 
+    <section id="wyrokiView" hidden>
+      <div class="controls">
+        <div class="searchrow">
+          <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: VAT, ulga, koszty, zwolnienie…  (Enter)" autocomplete="off">
+          <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen w bazie SAOS">Szukaj</button>
+        </div>
+        <p class="livehint">Wyszukiwanie po haśle w treści orzeczeń — baza <b>SAOS</b> (sądy powszechne, Sąd Najwyższy, TK, KIO). Orzeczeń sądów administracyjnych (NSA/WSA) tu nie ma — te są w <a href="https://orzeczenia.nsa.gov.pl" target="_blank" rel="noopener">CBOSA</a>.</p>
+      </div>
+      <div id="wyrokiResults"></div>
+    </section>
+
+    <section id="kisView" hidden>
+      <div class="controls">
+        <div class="searchrow">
+          <input class="search" id="searchK" type="text" placeholder="Fraza do interpretacji: ulga B+R, najem prywatny, PIT-2…" autocomplete="off">
+          <button class="livebtn" id="kisBtn" title="Skopiuj fraze i otworz oficjalna wyszukiwarke">Szukaj w EUREKA</button>
+        </div>
+        <p class="livehint">Interpretacje KIS nie mają publicznego API, więc nie pokażę ich tutaj w aplikacji. Po kliknięciu <b>kopiuję frazę do schowka</b> i otwieram oficjalną wyszukiwarkę MF (EUREKA) — wystarczy wkleić (Ctrl+V) i nacisnąć szukaj.</p>
+      </div>
+      <div id="kisResults"></div>
+    </section>
+
     <section id="mojeView" hidden>
       <p class="livehint" style="margin:2px 2px 18px">Twoja kolekcja. Dodawaj plusikiem <b>+</b> z dowolnej zakładki (Wiadomości, Ustawy, RCL). Zapisuje się w tej przeglądarce.</p>
       <section id="mojeList"></section>
@@ -1064,6 +1102,17 @@ function toggleMoje(it){
 function addbtn(it){
   const on=mojeHas(it.link);
   return `<button class="addbtn${on?' added':''}" data-item="${esc(JSON.stringify(it))}" title="${on?'Usuń z „Moje”':'Dodaj do „Moje”'}">${on?'✓':'+'}</button>`;
+}
+// Po zmianie kolekcji odswiezamy wyglad WSZYSTKICH plusikow na stronie,
+// takze tych w wynikach wyszukiwania na zywo (render() ich nie przerysowuje).
+function syncAddBtns(){
+  document.querySelectorAll(".addbtn[data-item]").forEach(btn=>{
+    let link=""; try{ link=JSON.parse(btn.dataset.item).link; }catch(_){}
+    const on=mojeHas(link);
+    btn.classList.toggle("added", on);
+    btn.textContent = on ? "✓" : "+";
+    btn.title = on ? "Usuń z „Moje”" : "Dodaj do „Moje”";
+  });
 }
 const PL = new Intl.DateTimeFormat("pl-PL",{day:"numeric",month:"long",year:"numeric"});
 const NOW_Y = new Date().getFullYear();
@@ -1142,6 +1191,25 @@ function rclStatus(t){
   if(/status projektu:\s*zamkn/.test(low)) return "closed";
   return "in_gov";
 }
+// Wykrywa, ze projekt sie ZAKONCZYL: stal sie ustawa albo zostal dolaczony do
+// innego projektu (ktory czesto stal sie ustawa). Wyciaga odwolanie do Dz.U.
+function rclBecameLaw(t){
+  if(!t) return null;
+  const flat=t.replace(/<[^>]*>/g," ").replace(/\s+/g," ");
+  const low=flat.toLowerCase();
+  const isLaw=/sta[łl]a?\s*si[ęe]\s*ustaw/.test(low);
+  const merged=/do[łl][aą]czono do projektu/.test(low);
+  if(!isLaw && !merged) return null;
+  let poz=null, year=null;
+  const mp=low.match(/dz\.?\s*u\.?[\s\S]{0,60}?poz\.?\s*0*(\d{1,5})/);
+  if(mp) poz=mp[1];
+  let my=low.match(/ustaw[aąy][\s\S]{0,90}?((?:19|20)\d{2})\s*r/);
+  if(!my) my=low.match(/((?:19|20)\d{2})[\s\S]{0,25}?poz/);
+  if(my) year=my[1];
+  const link=(poz && year) ? `http://dziennikustaw.gov.pl/DU/${year}/${poz}` : null;
+  const ref=(year&&poz) ? `Dz.U. ${year} poz. ${poz}` : (poz ? `Dz.U. poz. ${poz}` : "");
+  return {isLaw, merged, poz, year, link, ref};
+}
 const RCL_STAGE_KW=["lobbing","uzgodnie","konsultacj","opiniowan","komitet","komisj","rada ministr","radzie ministr","potwierdz","skierowan","notyfikacj","rozpatrz","przyjęc","przyjet"];
 function rclStages(text){
   if(!text) return [];
@@ -1168,7 +1236,13 @@ function legisCard(it){
   const type = it.type || ((it.src||"").indexOf("RCL")>=0 ? "rcl" : "ustawa");
   const mini = {type, title:it.title, link:it.link, src:it.src, stage:it.stage||"", step:it.step||1};
   let body;
-  if(it.stages && it.stages.length){
+  if(it.became){
+    const dz = it.dzuLink
+      ? `<a class="rp-link" href="${esc(it.dzuLink)}" target="_blank" rel="noopener">Zobacz ustawę w Dz.U.${it.dzuRef?" ("+esc(it.dzuRef)+")":""} →</a>`
+      : "";
+    const ref = (!it.dzuLink && it.dzuRef) ? `<div class="lstage"><span>Akt</span> ${esc(it.dzuRef)}</div>` : "";
+    body = `<div class="lnote lnote-done">✓ ${esc(it.stage||"Zakończony — stał się ustawą")}</div>${ref}${dz}<a class="rp-link" href="${esc(it.link)}" target="_blank" rel="noopener">Szczegóły w RCL →</a>`;
+  } else if(it.stages && it.stages.length){
     const cur = it.stages.find(s=>s.state==="cur") || it.stages[it.stages.length-1];
     body = `<details class="rclproc">
       <summary><span class="rp-now">W rządzie: ${esc(cur?cur.name:"—")}</span><span class="rp-tog">etapy</span></summary>
@@ -1183,7 +1257,7 @@ function legisCard(it){
   } else {
     body = stepper(it.step||1) + stageLine;
   }
-  return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''}" style="--ccol:${it.color}">
+  return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''} ${it.became?'is-done':''}" style="--ccol:${it.color}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lright"><span class="lwhen">${esc(when)}</span>${addbtn(mini)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
     ${body}
@@ -1277,13 +1351,16 @@ async function searchRCL(){
     // strony projektów pobieramy RÓWNOLEGLE (szybko)
     const pages=await Promise.all(cand.map(c=>getText(c.link)));
     cand.forEach((c,i)=>{
-      const page=pages[i]; const st=rclStatus(page);
+      const page=pages[i]; const st=rclStatus(page); const bl=rclBecameLaw(page);
       const base={type:"rcl", title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
-      if(st==="in_gov")            out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
+      if(bl && bl.isLaw)           out.push({...base, became:true, dzuLink:bl.link, dzuRef:bl.ref, stage:"Zakończony — stał się ustawą"});
+      else if(bl && bl.merged)     out.push({...base, became:true, dzuLink:null, dzuRef:"", stage:"Zakończony — dołączony do innego projektu"});
+      else if(st==="in_gov")       out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
       else if(st==="left"  && numLike) out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
       else if(st==="closed"&& numLike) out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
       else if(!st)                 out.push({...base, stage:"Etap rządowy — sprawdź w RCL"});
-      // przy szukaniu PO SŁOWIE: zakończone/przekazane do Sejmu pomijamy (nieważne)
+      // przy szukaniu PO SŁOWIE: zakończone/przekazane do Sejmu pomijamy (nieważne),
+      // ale "stał się ustawą" pokazujemy ZAWSZE (to ważny, prawdziwy wynik).
     });
   }catch(e){}
   btn.disabled=false;
@@ -1295,6 +1372,58 @@ async function searchRCL(){
     return;
   }
   box.innerHTML=`<div class="live-sec-head">Projekty rządowe (RCL) — „${esc(q)}" (${out.length})</div><div class="lgrid">${out.map(legisCard).join("")}</div>`;
+}
+
+// Wyroki / orzeczenia — wyszukiwanie po hasle w bazie SAOS (czyste API JSON)
+function wyrokCard(it){
+  const court = (it.division && it.division.court && it.division.court.name) || it.courtType || "Sąd";
+  const sig = (it.courtCases && it.courtCases[0] && it.courtCases[0].caseNumber) || "";
+  const date = it.judgmentDate || "";
+  const map = {SENTENCE:"wyrok", DECISION:"postanowienie", RESOLUTION:"uchwała", REGULATION:"zarządzenie", REASONS:"uzasadnienie"};
+  const kind = map[it.judgmentType] || "orzeczenie";
+  let snip = (it.textContent||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
+  if(snip.length>240) snip = snip.slice(0,240)+"…";
+  const link = "https://www.saos.org.pl/judgments/"+it.id;
+  const title = (sig ? sig+" — " : "") + court;
+  const mini = {type:"wyrok", title:title, link:link, src:kind, stage:"", step:0};
+  return `<article class="lcard" style="--ccol:#3a5c8a">
+    <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(kind)}${date?" · "+esc(date):""}</span><span class="lright">${addbtn(mini)}</span></div>
+    <a class="ltitle" href="${esc(link)}" target="_blank" rel="noopener">${esc(title)}</a>
+    ${snip?`<p class="wyrok-snip">${esc(snip)}</p>`:""}
+  </article>`;
+}
+async function searchWyroki(){
+  const q=($("#searchW").value||"").trim();
+  const box=$("#wyrokiResults"), btn=$("#wyrokiBtn");
+  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
+  btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam orzeczeń w SAOS…</div>`;
+  let items=[];
+  try{
+    const url=`https://www.saos.org.pl/api/search/judgments?pageSize=20&pageNumber=0&all=${encodeURIComponent(q)}&sortingField=JUDGMENT_DATE&sortingDirection=DESC`;
+    const data=await getJSON(url);
+    if(data && Array.isArray(data.items)) items=data.items;
+  }catch(e){}
+  btn.disabled=false;
+  if(!items.length){
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem dla „${esc(q)}". Spróbuj innego słowa albo kliknij ponownie (przekaźnik mógł nie odpowiedzieć).</div>`;
+    return;
+  }
+  box.innerHTML=`<div class="live-sec-head">Orzeczenia (SAOS) — „${esc(q)}" (${items.length})</div><div class="lgrid">${items.map(wyrokCard).join("")}</div>`;
+  syncAddBtns();
+}
+
+// Interpretacje KIS — brak publicznego API, wiec kopiujemy fraze i otwieramy oficjalna wyszukiwarke
+function searchKIS(){
+  const q=($("#searchK").value||"").trim();
+  const box=$("#kisResults");
+  if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
+  let copied=false;
+  try{ navigator.clipboard.writeText(q); copied=true; }catch(_){}
+  try{ window.open("https://eureka.mf.gov.pl/", "_blank", "noopener"); }catch(_){}
+  box.innerHTML=`<div class="kis-launch">
+    <p>${copied?'Skopiowałem frazę <b>„'+esc(q)+'"</b> do schowka.':'Fraza: <b>„'+esc(q)+'"</b>.'} Otworzyłem EUREKA w nowej karcie — wklej (Ctrl+V) w pole „Wpisz frazę wyszukiwania" i naciśnij szukaj.</p>
+    <p class="kis-alt">Inne bazy z tą frazą: <a href="https://interpretacje.gofin.pl/" target="_blank" rel="noopener">Interpretacje GOFIN</a> · <a href="https://www.podatki.gov.pl/interpretacje-indywidualne/" target="_blank" rel="noopener">KIS / podatki.gov.pl</a></p>
+  </div>`;
 }
 
 function renderNews(){
@@ -1339,10 +1468,10 @@ function renderUstawy(){ return renderTracker(ustawyVisible(), $("#legis"), stat
 function renderRcl(){ return renderTracker(rclVisible(), $("#rclList"), state.qR.trim().length>0, "Projekty na etapie rządowym", "projektów"); }
 
 function mojeCard(it){
-  const label = it.type==="news" ? "Wiadomość" : (it.type==="rcl" ? "RCL" : "Ustawa");
-  const col   = it.type==="news" ? "#7a5a2e" : (it.type==="rcl" ? "#8a2e2a" : "#1d3a6b");
+  const label = it.type==="news" ? "Wiadomość" : it.type==="rcl" ? "RCL" : it.type==="wyrok" ? "Wyrok" : "Ustawa";
+  const col   = it.type==="news" ? "#7a5a2e" : it.type==="rcl" ? "#8a2e2a" : it.type==="wyrok" ? "#3a5c8a" : "#1d3a6b";
   const st = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
-  const bell = it.type==="rcl"
+  const bell = (it.type==="rcl" || it.type==="ustawa")
     ? `<button class="notifybtn${it.notify?' on':''}" data-notify="${esc(it.link)}" title="${it.notify?'Pilnowane mailowo - kliknij, aby wyłączyć':'Dodaj do powiadomień mailowych'}">${it.notify?'🔔 pilnowane':'🔔 powiadom'}</button>`
     : "";
   return `<article class="lcard" style="--ccol:${col}">
@@ -1358,7 +1487,7 @@ function renderMoje(){
     L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Pusto w „Moje"</h3><p>Dodawaj pozycje plusikiem + z innych zakładek.</p></div>`;
     return 0;
   }
-  const watch = state.moje.filter(x=>x.type==="rcl" && x.notify);
+  const watch = state.moje.filter(x=>(x.type==="rcl"||x.type==="ustawa") && x.notify);
   let panel = "";
   if(watch.length){
     const lines = watch.map(x=>x.link).join("\n");
@@ -1393,8 +1522,15 @@ function updateMojeBadge(n){
 function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
-  const c = state.tab==="legis"?u : state.tab==="rcl"?r : state.tab==="moje"?mj : n;
+  let c;
+  if(state.tab==="legis") c=u;
+  else if(state.tab==="rcl") c=r;
+  else if(state.tab==="moje") c=mj;
+  else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
+  else if(state.tab==="kis") c=0;
+  else c=n;
   $("#stCount").textContent = c;
+  syncAddBtns();
 }
 
 function switchTab(t){
@@ -1403,6 +1539,8 @@ function switchTab(t){
   $("#newsView").hidden  = t!=="news";
   $("#legisView").hidden = t!=="legis";
   $("#rclView").hidden   = t!=="rcl";
+  $("#wyrokiView").hidden= t!=="wyroki";
+  $("#kisView").hidden   = t!=="kis";
   $("#mojeView").hidden  = t!=="moje";
   render();
 }
@@ -1417,6 +1555,10 @@ function switchTab(t){
   $("#searchL").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchDU(); } });
   $("#rclBtn").onclick=searchRCL;
   $("#searchR").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchRCL(); } });
+  $("#wyrokiBtn").onclick=searchWyroki;
+  $("#searchW").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchWyroki(); } });
+  $("#kisBtn").onclick=searchKIS;
+  $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   // delegacja: „+" dodaj / „✓" usuń (na kartach) oraz usuń w „Moje"
   document.body.addEventListener("click", e=>{

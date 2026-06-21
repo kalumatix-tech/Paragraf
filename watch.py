@@ -50,11 +50,35 @@ def rcl_status(page_text):
     if not page_text:
         return None
     low = page_text.lower()
+    if re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low:
+        return "became_law"
     if "na stronach sejmu" in low or "dalszy ciąg procesu legislacyjnego" in low:
         return "left"
     if re.search(r"status projektu:\s*zamkn", low):
         return "closed"
     return "in_gov"
+
+
+def rcl_became_law(page_text):
+    """Czy projekt sie zakonczyl (stal sie ustawa / dolaczony do innego) + odwolanie do Dz.U."""
+    if not page_text:
+        return None
+    flat = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", page_text))
+    low = flat.lower()
+    is_law = re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) is not None
+    merged = "dołączono do projektu" in low
+    if not (is_law or merged):
+        return None
+    poz = year = None
+    mp = re.search(r"dz\.?\s*u\.?.{0,60}?poz\.?\s*0*(\d{1,5})", low)
+    if mp:
+        poz = mp.group(1)
+    my = re.search(r"ustaw[aąy].{0,90}?((?:19|20)\d{2})\s*r", low)
+    if not my:
+        my = re.search(r"((?:19|20)\d{2}).{0,25}?poz", low)
+    if my:
+        year = my.group(1)
+    return {"is_law": is_law, "merged": merged, "poz": poz, "year": year}
 
 
 def rcl_stages(page_text):
@@ -124,10 +148,25 @@ def resolve_url(entry):
 
 def signature(url):
     """Zwraca (podpis_stanu, opis_dla_człowieka, tytuł) lub (None, None, None)."""
+    low_url = url.lower()
+    # Akt juz opublikowany (Dz.U. / ELI / PDF) - etap zakonczony, nic do pilnowania.
+    if (low_url.endswith(".pdf") or "/text.pdf" in low_url
+            or "dziennikustaw.gov.pl" in low_url or "/eli/acts/" in low_url):
+        return "opublikowana", "ustawa opublikowana (Dz.U.) - etap zakonczony", url
     page = _get(url)
     if not page:
         return None, None, None
     status = rcl_status(page)
+    if status == "became_law":
+        bl = rcl_became_law(page) or {}
+        if bl.get("year") and bl.get("poz"):
+            ref = f"Dz.U. {bl['year']} poz. {bl['poz']}"
+        elif bl.get("poz"):
+            ref = f"Dz.U. poz. {bl['poz']}"
+        else:
+            ref = ""
+        desc = "zakonczony - stal sie ustawa" + (f" ({ref})" if ref else "")
+        return f"became_law|{ref}", desc, project_title(page)
     stages = rcl_stages(page)
     cur = next((s for s in stages if s.get("state") == "cur"), None) or (stages[-1] if stages else None)
     cur_name = cur["name"] if cur else ""
@@ -135,8 +174,10 @@ def signature(url):
         desc = "opuścił rząd → dalej w Sejmie / Dz.U."
     elif status == "closed":
         desc = "zamknięty (etap rządowy)"
-    else:
+    elif status == "in_gov":
         desc = "w rządzie: " + (cur_name or "—")
+    else:
+        desc = "stan nieustalony (strona nie odpowiedziała jak zwykle)"
     return f"{status}|{cur_name}", desc, project_title(page)
 
 
