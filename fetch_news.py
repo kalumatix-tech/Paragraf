@@ -936,10 +936,8 @@ TEMPLATE = r'''<!DOCTYPE html>
   .lsec-head{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
   .lsec-head .lt{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--ink)}
   .lsec-head .lcount{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
-  /* sekcja "Wchodza w zycie wkrotce" - wydzielona bursztynowa karta, zeby nie zlewala sie z Dz.U. */
-  #legisSoon:not(:empty){display:block;margin:2px 0 26px;padding:15px 16px 6px;
-    background:rgba(176,124,42,.07);border:1px solid rgba(176,124,42,.3);border-radius:13px}
-  #legisSoon .lsec-head{border-bottom-color:#b07c2a;margin-bottom:10px}
+  /* sekcja "Wchodza w zycie" - osobna zakladka; naglowek w kolorze bursztynu */
+  #legisSoon .lsec-head{border-bottom-color:#b07c2a}
   #legisSoon .lsec-head .lt{color:#8a5a2e}
   .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
   .lcard{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ccol,var(--accent));
@@ -1112,6 +1110,22 @@ TEMPLATE = r'''<!DOCTYPE html>
   .vat-xb-warunki{margin:0 0 9px;padding-left:18px;font-size:12px;color:var(--ink-soft);line-height:1.5}
   .vat-xb-warunki li{margin-bottom:4px}
   .vat-xb-podst{font-size:11px;color:var(--ink-faint);font-style:italic;padding-top:9px;border-top:1px dashed var(--line)}
+  .vat-xb-kto{font-size:12.5px;color:var(--ink);line-height:1.55;margin-bottom:10px;
+    padding:9px 11px;background:rgba(138,46,42,.06);border-left:3px solid var(--accent);border-radius:0 8px 8px 0}
+  .vat-xb-thr{margin:0 0 11px;padding:11px 12px;background:var(--surface);border:1px solid var(--line);border-radius:9px}
+  .vat-thr-lbl{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+  .vat-xb-thr .vat-input{margin-bottom:9px}
+  .vat-thr-res{font-size:12.5px;line-height:1.55;padding:9px 11px;border-radius:8px}
+  .vat-thr-over{background:rgba(176,124,42,.12);border:1px solid rgba(176,124,42,.35);color:#7a5320}
+  .vat-thr-under{background:rgba(42,122,74,.1);border:1px solid rgba(42,122,74,.3);color:#1f5e39}
+  .vat-thr-note{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:9px;font-style:italic}
+  .vat-xb-ex{font-size:12px;color:var(--ink-soft);line-height:1.55;margin-bottom:10px;
+    padding:8px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:8px}
+  .vat-xb-ex b{color:var(--ink)}
+  .vat-xb-links{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 11px}
+  .vat-xb-link{font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;
+    padding:5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+  .vat-xb-link:hover{border-color:var(--accent)}
   /* kalkulator */
   .kalk-inputs{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
   .kin{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
@@ -1189,6 +1203,8 @@ TEMPLATE = r'''<!DOCTYPE html>
   .wf{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-faint);font-weight:600}
   .wf input,.wf select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;
     font-family:var(--sans);background:var(--surface);color:var(--ink)}
+  .wf-chk{flex-direction:row;align-items:center;gap:6px;padding-bottom:8px}
+  .wf-chk input{padding:0;width:15px;height:15px;accent-color:var(--accent)}
   .wyr-ct{display:inline-block;color:#f3e9df;font-size:10px;font-weight:700;border-radius:5px;
     padding:1px 6px;letter-spacing:.02em;vertical-align:middle}
   .wyr-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px 0 4px;
@@ -1265,6 +1281,11 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <div id="legisSubBar" class="subtabs" data-subbar="legis" hidden></div>
 
+    <section id="legisSoonView" hidden>
+      <section id="legisSoon"></section>
+      <div id="legisSoonEmpty" class="live-status" hidden>Na razie nic nie czeka na wejście w życie. Pojawią się tu akty już opublikowane w Dz.U./M.P., które zaczną obowiązywać dopiero w przyszłości.</div>
+    </section>
+
     <section id="legisView" hidden>
       <div class="controls">
         <div class="searchrow">
@@ -1274,7 +1295,6 @@ TEMPLATE = r'''<!DOCTYPE html>
         <p class="livehint">Pisanie filtruje na bieżąco to, co już pobrane. <b>„Szukaj na żywo"</b> (albo Enter) odpytuje Dziennik Ustaw i Monitor Polski w czasie rzeczywistym.</p>
       </div>
       <div id="liveResults"></div>
-      <section id="legisSoon"></section>
       <section id="legis"></section>
     </section>
 
@@ -1292,12 +1312,8 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <section id="wyrokiView" hidden>
       <div class="controls">
-        <div class="srcToggle" id="wyrokiSrc">
-          <button class="srcbtn on" data-src="saos">SAOS — wyniki w aplikacji (też NSA/WSA)</button>
-          <button class="srcbtn" data-src="cbosa">CBOSA — pełniejsza baza podatkowa (otwiera się)</button>
-        </div>
         <div class="searchrow">
-          <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: VAT, ulga, koszty, zwolnienie…  (Enter)" autocomplete="off">
+          <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: substancja ekonomiczna, ulga B+R, koszty…  (Enter)" autocomplete="off">
           <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen">Szukaj</button>
         </div>
         <div class="wyr-filters" id="wyrFilters">
@@ -1305,8 +1321,9 @@ TEMPLATE = r'''<!DOCTYPE html>
           <label class="wf"><span>Do</span><input id="wyrTo" type="date"></label>
           <label class="wf"><span>Typ</span><select id="wyrType"><option value="">wszystkie</option><option value="SENTENCE">wyrok</option><option value="DECISION">postanowienie</option><option value="RESOLUTION">uchwała</option></select></label>
           <label class="wf"><span>Sortuj</span><select id="wyrSort"><option value="DESC">od najnowszych</option><option value="ASC">od najstarszych</option></select></label>
+          <label class="wf wf-chk"><input id="wyrPhrase" type="checkbox" checked><span>Dokładna fraza</span></label>
         </div>
-        <p class="livehint"><b>SAOS</b> ma API, więc wyniki pokazuję tu w aplikacji. Obejmuje sądy powszechne, SN, TK, KIO <b>oraz sądy administracyjne (NSA/WSA)</b> — czyli orzeczenia podatkowe też się pojawiają, choć jego baza administracyjna bywa mniej kompletna i aktualna niż CBOSA. Po najpełniejsze i najnowsze orzecznictwo podatkowe przełącz na <b>CBOSA</b> — nie ma API i blokuje automatyczny dostęp, więc dla niej kopiuję frazę i otwieram jej wyszukiwarkę.</p>
+        <p class="livehint">Wyniki z bazy <b>SAOS</b> (API): sądy powszechne, SN, TK, KIO <b>oraz administracyjne NSA/WSA</b> — orzeczenia podatkowe też się pojawiają. <b>Dokładna fraza</b> (domyślnie) szuka słów dokładnie obok siebie — „substancja ekonomiczna" nie pokaże już „substancji psychoaktywnej". Odznacz, by szukać każdego słowa osobno. Działa też składnia SAOS: cudzysłów = fraza, <i>OR</i> = lub, minus = bez słowa (np. <i>dobro -osobiste</i>).</p>
       </div>
       <div id="wyrokiResults"></div>
     </section>
@@ -1349,8 +1366,11 @@ TEMPLATE = r'''<!DOCTYPE html>
       <div class="subtabs" data-subbar="stawki"></div>
       <div id="stawkiSciaga"><div class="controls"><div id="sciagawkaBox"></div><div id="sciagaCustom"></div></div></div>
       <div id="stawkiZus"><div class="controls"><div id="zusBox"></div></div></div>
-      <div id="stawkiVat"><div class="controls"><div id="vatBox"></div></div></div>
-      <!-- vatBox wypelniany przez renderVAT: weryfikator stawki PL + stawki wg panstwa -->
+    </section>
+
+    <section id="vatView" hidden>
+      <div class="controls"><div id="vatBox"></div></div>
+      <!-- vatBox wypelniany przez renderVAT: weryfikator PL + stawki wg panstwa + schemat transgraniczny -->
     </section>
 
     <section id="kalkView" hidden>
@@ -1486,7 +1506,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(),
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set(),
   sub:{ legis:"proc", terminy:"lista", kursy:"kursy", stawki:"sciaga", kalk:"jdg" }, sciaga:[] };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
@@ -1901,9 +1921,18 @@ function wyrokCard(it){
   </article>`;
 }
 let wyrCtx=null;
+function wyrQuery(q, phrase){
+  q=(q||"").trim();
+  if(!q) return "";
+  // jesli uzytkownik sam uzyl skladni SAOS (cudzyslow / OR / minus) - nie ruszamy
+  if(q.indexOf('"')>=0 || /\bOR\b/.test(q) || /(^|\s)-\S/.test(q)) return q;
+  // domyslnie: wieloslowne zapytanie -> dokladna fraza w cudzyslowie (zaweza wyniki)
+  if(phrase && /\s/.test(q)) return '"'+q+'"';
+  return q;
+}
 function wyrUrl(c){
   let u=`https://www.saos.org.pl/api/search/judgments?pageSize=20&pageNumber=${c.page}&sortingField=JUDGMENT_DATE&sortingDirection=${c.sort||"DESC"}`;
-  if(c.q) u+="&all="+encodeURIComponent(c.q);
+  if(c.q){ const qq=wyrQuery(c.q,c.phrase); if(qq) u+="&all="+encodeURIComponent(qq); }
   if(c.from) u+="&judgmentDateFrom="+c.from;
   if(c.to) u+="&judgmentDateTo="+c.to;
   if(c.jtype) u+="&judgmentTypes="+c.jtype;
@@ -1919,7 +1948,7 @@ async function wyrFetch(){
   }catch(e){}
   if(btn) btn.disabled=false;
   if(!items.length){
-    box.innerHTML=`<div class="live-status">${c.page>0?"Brak dalszych wyników — wróć na poprzednią stronę.":'Nic nie znalazłem w SAOS dla tych kryteriów. SAOS obejmuje też sądy administracyjne, ale jego baza podatkowa bywa niepełna — spróbuj innych słów lub przełącz na <b>CBOSA</b> (pełniejsza baza NSA/WSA). Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.'}</div>`;
+    box.innerHTML=`<div class="live-status">${c.page>0?"Brak dalszych wyników — wróć na poprzednią stronę.":'Nic nie znalazłem w SAOS dla tych kryteriów. Spróbuj innych słów, odznacz „Dokładna fraza" (wtedy szuka każdego słowa osobno) albo poszerz zakres dat. Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.'}</div>`;
     return;
   }
   const totalPages = total!=null ? Math.max(Math.ceil(total/20),1) : null;
@@ -1939,21 +1968,10 @@ async function wyrFetch(){
 async function searchWyroki(){
   const box=$("#wyrokiResults");
   const q=($("#searchW").value||"").trim();
-  // CBOSA: brak API + blokuje boty -> kopiujemy fraze i otwieramy jej wyszukiwarke.
-  if(state.wyrokiSrc==="cbosa"){
-    if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
-    let copied=false;
-    try{ navigator.clipboard.writeText(q); copied=true; }catch(_){}
-    try{ window.open("https://orzeczenia.nsa.gov.pl/cbo/query", "_blank", "noopener"); }catch(_){}
-    box.innerHTML=`<div class="kis-launch">
-      <p>${copied?'Skopiowałem frazę <b>„'+esc(q)+'"</b> do schowka.':'Fraza: <b>„'+esc(q)+'"</b>.'} Otworzyłem wyszukiwarkę <b>CBOSA</b> (NSA/WSA) w nowej karcie — wklej (Ctrl+V) w pole „Szukana fraza" i naciśnij „Szukaj".</p>
-      <p class="kis-alt">CBOSA blokuje automatyczne pobieranie i nie ma API, dlatego nie da się jej wyników wciągnąć tutaj. To najpełniejsze i najnowsze źródło orzeczeń podatkowych (sądy administracyjne) — SAOS też je ma, ale w węższym zakresie.</p>
-    </div>`;
-    return;
-  }
   const from=($("#wyrFrom")||{}).value||"", to=($("#wyrTo")||{}).value||"", jtype=($("#wyrType")||{}).value||"", sort=($("#wyrSort")||{}).value||"DESC";
+  const phrase=!!(($("#wyrPhrase")||{}).checked);
   if(q.length<2 && !from && !to && !jtype){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki albo ustaw filtr (data/typ).</div>`; return; }
-  wyrCtx={q, from, to, jtype, sort, page:0};
+  wyrCtx={q, phrase, from, to, jtype, sort, page:0};
   wyrFetch();
 }
 
@@ -2025,23 +2043,21 @@ function renderTracker(items, L, searching, headOn, countWord){
 function renderUstawy(){
   const all=ustawyVisible();
   const searching=state.qL.trim().length>0;
-  const soonBox=$("#legisSoon");
-  if(searching){
-    if(soonBox) soonBox.innerHTML="";
-    return renderTracker(all, $("#legis"), true, "Sejm i Dziennik Ustaw", "śledzonych");
-  }
+  const soonBox=$("#legisSoon"), soonEmpty=$("#legisSoonEmpty");
   const now=Date.now();
   const fdate=it=>{ if(!it.inforce) return null; const d=new Date(it.inforce); return isNaN(d.getTime())?null:d; };
   const isFuture=it=>{ const d=fdate(it); return d && d.getTime()>now; };
   const soon=all.filter(isFuture).sort((a,b)=>fdate(a)-fdate(b));
-  const rest=all.filter(it=>!isFuture(it));
   if(soonBox){
     soonBox.innerHTML = soon.length
       ? `<div class="lsec-head"><span class="lt">⏱ Wchodzą w życie wkrótce</span><span class="lcount">${soon.length}</span></div>`
-        +`<p class="livehint" style="margin:-4px 0 10px">Akty opublikowane, które dopiero zaczną obowiązywać. Śledzę datę wejścia w życie najnowszych aktów z Dz.U./M.P.</p>`
+        +`<p class="livehint" style="margin:-4px 0 14px">Akty opublikowane, które dopiero zaczną obowiązywać. Śledzę datę wejścia w życie najnowszych aktów z Dz.U./M.P.</p>`
         +`<div class="lgrid">${soon.map(legisCard).join("")}</div>`
       : "";
   }
+  if(soonEmpty) soonEmpty.hidden = soon.length>0;
+  if(searching) return renderTracker(all, $("#legis"), true, "Sejm i Dziennik Ustaw", "śledzonych");
+  const rest=all.filter(it=>!isFuture(it));
   return renderTracker(rest, $("#legis"), false, "Sejm i Dziennik Ustaw", "śledzonych") + soon.length;
 }
 function renderRcl(){ return renderTracker(rclVisible(), $("#rclList"), state.qR.trim().length>0, "Projekty na etapie rządowym", "projektów"); }
@@ -2576,69 +2592,176 @@ function vatVerify(q){
   }
   return {rate:"23%", cat:"stawka podstawowa", note:"Większość towarów i usług. Jeśli to żywność, książki albo usługa społeczna/medyczna — sprawdź dokładniej; 23% to wartość domyślna."};
 }
-// --- Schemat VAT transgraniczny: sprzedaz z Polski (towar/usluga x firma/konsument x UE/poza UE) ---
+// --- Schemat VAT transgraniczny: sprzedaz z PL (out) i zakup do PL (in); kazdy: towar/usluga x firma/konsument x UE/poza ---
+const VIES_URL="https://ec.europa.eu/taxation_customs/vies/#/vat-validation";
+const OSS_URL="https://www.podatki.gov.pl/vat/wyjasnienia/rejestracja-do-procedury-unijnej-oraz-nieunijnej-oss-i-procedury-importu-ioss-180424/";
 const VAT_XB = {
-  towar: {
-    b2b: {
-      ue: {tag:"WDT · 0%", col:"#2a6a7a", title:"Wewnątrzwspólnotowa dostawa towarów (WDT)", rate:"0% VAT",
-        desc:"Sprzedaż towaru firmie z innego kraju UE. Stawka 0%, a prawo do odliczenia VAT od zakupów zachowane.",
-        warunki:["Nabywca ma ważny numer VAT-UE — sprawdź w bazie VIES","Masz dokumenty potwierdzające wywóz towaru do innego kraju UE","Wykazujesz transakcję w informacji podsumowującej VAT-UE"],
-        podstawa:"art. 13 i 42 ustawy o VAT"},
-      poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towarów", rate:"0% VAT",
-        desc:"Wywóz towaru poza UE (np. do Wielkiej Brytanii, USA). Stawka 0% po potwierdzeniu wywozu.",
-        warunki:["Masz dokument potwierdzający wywóz poza UE — komunikat IE-599 albo dokument celny","Bez potwierdzenia w terminie stosujesz stawkę krajową, z korektą po otrzymaniu dokumentu","Nabywca zwykle płaci VAT importowy i cło w swoim kraju"],
-        podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+  out: {
+    towar: {
+      b2b: {
+        ue: {tag:"WDT · 0%", col:"#2a6a7a", title:"Wewnątrzwspólnotowa dostawa towarów (WDT)", rate:"0% VAT",
+          kto:"Ty wystawiasz 0%. VAT rozlicza nabywca w swoim kraju (mechanizm WDT u Ciebie, WNT u niego) — podatek nie znika, przenosi się na nabywcę.",
+          przyklad:"Faktura 10 000 zł → VAT 0 zł. Niemiecki nabywca rozlicza WNT u siebie.",
+          warunki:["Nabywca ma ważny numer VAT-UE — sprawdź w bazie VIES","Masz dokumenty potwierdzające wywóz towaru do innego kraju UE","Wykazujesz w informacji podsumowującej VAT-UE"],
+          links:[{l:"Sprawdź numer VAT-UE w VIES",u:VIES_URL}],
+          podstawa:"art. 13 i 42 ustawy o VAT"},
+        poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towarów (poza UE)", rate:"0% VAT",
+          kto:"Ty wystawiasz 0%, ale to NIE jest sprzedaż bez podatku: VAT (importowy) i cło płaci nabywca przy odprawie w kraju przeznaczenia. Podatek pobiera kraj docelowy — tyle że od importera, nie od Ciebie.",
+          przyklad:"Faktura 10 000 zł → VAT 0 zł. Cło i VAT importowy płaci nabywca w kraju docelowym.",
+          warunki:["Masz dokument potwierdzający wywóz poza UE — komunikat IE-599 lub dokument celny","Bez potwierdzenia w terminie stosujesz stawkę krajową, z korektą po otrzymaniu dokumentu"],
+          podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+      },
+      b2c: {
+        ue: {tag:"WSTO · OSS", col:"#b07c2a", title:"Sprzedaż towaru konsumentowi w UE (WSTO)", rate:"zależy od progu 10 000 EUR", threshold:true,
+          kto:"Do limitu 10 000 EUR rocznie — polski VAT. Powyżej — VAT kraju konsumenta, rozliczany przez VAT-OSS.",
+          przyklad:"Sprzedaż 12 000 zł do Niemiec (powyżej progu) → VAT niemiecki (19%) przez OSS, nie polski.",
+          warunki:["Limit 10 000 EUR liczony łącznie dla całej sprzedaży WSTO i usług elektronicznych do konsumentów w UE","Powyżej limitu rejestrujesz się do VAT-OSS i składasz jedną deklarację w Polsce, płacąc stawki krajów nabywców"],
+          links:[{l:"Rejestracja OSS (podatki.gov.pl)",u:OSS_URL}],
+          podstawa:"art. 22a ustawy o VAT, procedura OSS"},
+        poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towaru do konsumenta poza UE", rate:"0% VAT",
+          kto:"Ty wystawiasz 0%. Konsument płaci VAT importowy i ewentualnie cło w swoim kraju przy odprawie.",
+          przyklad:"Paczka 800 zł do USA → VAT 0 zł. Klient może zapłacić lokalny podatek i cło przy odbiorze.",
+          warunki:["Dokument potwierdzający wywóz poza UE","Przy wysyłce do konsumenta sprawdź lokalne progi i obowiązki (np. brytyjski VAT od przesyłek o niskiej wartości)"],
+          podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+      },
     },
-    b2c: {
-      ue: {tag:"WSTO · OSS", col:"#b07c2a", title:"Wewnątrzwspólnotowa sprzedaż towarów na odległość (WSTO)", rate:"VAT kraju nabywcy (powyżej progu)",
-        desc:"Sprzedaż towaru konsumentowi w innym kraju UE (e-commerce). Co do zasady VAT kraju konsumenta.",
-        warunki:["Do limitu 10 000 EUR rocznie (łącznie WSTO + usługi elektroniczne) możesz stosować polski VAT","Powyżej limitu — VAT kraju nabywcy, najwygodniej przez procedurę VAT-OSS: jedna deklaracja składana w Polsce"],
-        podstawa:"art. 22a ustawy o VAT, procedura OSS"},
-      poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towarów do konsumenta", rate:"0% VAT",
-        desc:"Wywóz towaru do konsumenta poza UE. Traktowany jak eksport — 0% po potwierdzeniu wywozu.",
-        warunki:["Dokument potwierdzający wywóz poza UE","Konsument może być zobowiązany do zapłaty cła i VAT importowego w swoim kraju"],
-        podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+    usluga: {
+      b2b: {
+        ue: {tag:"Reverse charge", col:"#6b4a8a", title:"Usługa dla firmy z UE — odwrotne obciążenie", rate:"bez VAT (rozlicza nabywca)",
+          kto:"Ty wystawiasz fakturę bez VAT. VAT rozlicza nabywca w swoim kraju (reverse charge).",
+          przyklad:"Faktura 5 000 zł → VAT 0 zł, adnotacja reverse charge. Nabywca rozlicza VAT u siebie.",
+          warunki:["Miejsce opodatkowania to kraj nabywcy (zasada B2B)","Faktura bez kwoty VAT, z adnotacją: odwrotne obciążenie / reverse charge","Wykazujesz w informacji podsumowującej VAT-UE"],
+          links:[{l:"Sprawdź numer VAT-UE w VIES",u:VIES_URL}],
+          podstawa:"art. 28b ustawy o VAT"},
+        poza: {tag:"Poza PL VAT", col:"#6b4a8a", title:"Usługa dla firmy spoza UE", rate:"bez VAT (poza zakresem PL)",
+          kto:"Ty wystawiasz fakturę bez VAT. Podatek rozlicza nabywca wg przepisów swojego kraju.",
+          przyklad:"Faktura 5 000 zł → VAT 0 zł. Podatek rozlicza nabywca w swoim kraju.",
+          warunki:["Miejsce opodatkowania to kraj nabywcy (państwo trzecie)","Nie wykazujesz w VAT-UE — to nie jest transakcja unijna"],
+          podstawa:"art. 28b ustawy o VAT"},
+      },
+      b2c: {
+        ue: {tag:"VAT PL (zasada)", col:"#8a2e2a", title:"Usługa dla konsumenta z UE", rate:"co do zasady VAT polski", threshold:true,
+          thrNote:"Próg dotyczy usług elektronicznych, telekomunikacyjnych i nadawczych (TBE). Pozostałe usługi B2C — zawsze polski VAT, bez progu.",
+          kto:"Co do zasady Ty naliczasz polski VAT. Wyjątek: usługi elektroniczne (TBE) — patrz próg poniżej.",
+          przyklad:"Korepetycje online 300 zł dla Niemca → polski VAT 23%. Ale e-book lub aplikacja (TBE) → reguła progu.",
+          warunki:["Zasada: miejsce opodatkowania to siedziba usługodawcy (Polska)","Usługi TBE — VAT kraju konsumenta powyżej progu 10 000 EUR, przez OSS","Wyjątek: nieruchomości — VAT kraju nieruchomości; transport, wstęp na imprezy, gastronomia — odrębne zasady"],
+          links:[{l:"Rejestracja OSS (podatki.gov.pl)",u:OSS_URL}],
+          podstawa:"art. 28c i 28k ustawy o VAT (wyjątki: art. 28e-28n)"},
+        poza: {tag:"Zależy od usługi", col:"#8a2e2a", title:"Usługa dla konsumenta spoza UE", rate:"zasada: VAT polski; częste wyjątki",
+          kto:"Zasada to polski VAT, ale wiele usług niematerialnych jest opodatkowanych w kraju konsumenta (wtedy bez polskiego VAT).",
+          przyklad:"Doradztwo 2 000 zł dla konsumenta z USA → zwykle bez polskiego VAT (art. 28l).",
+          warunki:["Wyjątek: usługi niematerialne (doradcze, prawne, reklamowe, licencje, IT) dla konsumenta spoza UE — opodatkowane w kraju konsumenta","Wyjątek: usługi elektroniczne dla konsumenta spoza UE — poza polskim VAT","Nieruchomości — VAT kraju nieruchomości"],
+          podstawa:"art. 28c oraz art. 28l ustawy o VAT"},
+      },
     },
   },
-  usluga: {
-    b2b: {
-      ue: {tag:"Reverse charge", col:"#6b4a8a", title:"Usługa dla firmy z UE — odwrotne obciążenie", rate:"Bez VAT (rozlicza nabywca)",
-        desc:"Miejsce opodatkowania to kraj nabywcy. Wystawiasz fakturę bez polskiego VAT z adnotacją: odwrotne obciążenie (reverse charge).",
-        warunki:["Nabywca to podatnik (firma) — warto potwierdzić jego numer VAT-UE","Faktura bez kwoty VAT, z adnotacją reverse charge / odwrotne obciążenie","Wykazujesz w informacji podsumowującej VAT-UE"],
-        podstawa:"art. 28b ustawy o VAT"},
-      poza: {tag:"Poza PL VAT", col:"#6b4a8a", title:"Usługa dla firmy spoza UE", rate:"Bez VAT (poza zakresem PL)",
-        desc:"Miejsce opodatkowania to kraj nabywcy (państwo trzecie). Faktura bez polskiego VAT.",
-        warunki:["Faktura bez VAT z adnotacją, że podatek rozlicza nabywca","Nie wykazujesz w VAT-UE — to nie jest transakcja unijna","Nabywca rozlicza podatek wg przepisów swojego kraju"],
-        podstawa:"art. 28b ustawy o VAT"},
+  in: {
+    towar: {
+      b2b: {
+        ue: {tag:"WNT", col:"#2a7a4a", title:"Wewnątrzwspólnotowe nabycie towarów (WNT)", rate:"VAT rozliczasz w PL",
+          kto:"To Ty (polski nabywca) rozliczasz VAT w Polsce — wykazujesz VAT należny i jednocześnie naliczony. Przy pełnym prawie do odliczenia jest to neutralne.",
+          przyklad:"Zakup 8 000 zł od firmy z Niemiec → VAT należny 1 840 zł i naliczony 1 840 zł, neutralnie.",
+          warunki:["Dotyczy czynnego podatnika VAT kupującego od firmy z UE","Podajesz sprzedawcy swój numer VAT-UE — wtedy on stosuje 0% (WDT u niego)","VAT należny i naliczony w tej samej deklaracji"],
+          links:[{l:"Sprawdź numer VAT-UE w VIES",u:VIES_URL}],
+          podstawa:"art. 9 i 86 ustawy o VAT"},
+        poza: {tag:"Import towarów", col:"#8a5a2e", title:"Import towarów (spoza UE)", rate:"VAT importowy + cło w PL",
+          kto:"To Ty (polski importer) płacisz VAT importowy i cło — przy odprawie celnej albo, w procedurze uproszczonej, w deklaracji VAT.",
+          przyklad:"Towar 5 000 zł + cło 200 zł → VAT 23% od 5 200 zł = 1 196 zł (do odliczenia).",
+          warunki:["VAT importowy można rozliczyć w deklaracji (art. 33a) zamiast płacić na granicy — szybsza neutralność","Podstawa opodatkowania obejmuje wartość celną powiększoną o cło","Zachowaj dokumenty celne (PZC/SAD)"],
+          podstawa:"art. 2 pkt 7 oraz art. 33-33a ustawy o VAT"},
+      },
+      b2c: {
+        ue: {tag:"VAT w cenie", col:"#2a7a4a", title:"Zakup towaru z UE jako osoba prywatna", rate:"VAT już w cenie",
+          kto:"Nie masz obowiązków VAT. Sprzedawca dolicza VAT — swojego kraju albo polski przez OSS, jeśli przekroczył próg sprzedaży do Polski.",
+          przyklad:"Zakup 500 zł ze sklepu w Niemczech → VAT już w cenie, nic nie dopłacasz.",
+          warunki:["Sprzedawca rozlicza WSTO/OSS — Ty płacisz tylko cenę z VAT","Nie składasz żadnej deklaracji"],
+          podstawa:"po stronie sprzedawcy: WSTO / OSS"},
+        poza: {tag:"Import VAT", col:"#8a5a2e", title:"Import towaru spoza UE jako osoba prywatna", rate:"VAT importowy (+ cło)",
+          kto:"Płacisz VAT importowy przy odprawie. Dla przesyłek do 150 EUR sprzedawca lub platforma może pobrać VAT od razu w cenie (procedura IOSS).",
+          przyklad:"Paczka z Chin za 200 zł → VAT 23% (46 zł) przy odprawie albo w cenie (IOSS dla przesyłek do 150 EUR).",
+          warunki:["Każda przesyłka spoza UE podlega VAT importowemu (zniesiono zwolnienie dla najmniejszych paczek)","Powyżej 150 EUR dochodzi cło","Przy IOSS VAT płacisz w cenie i unikasz formalności na granicy"],
+          podstawa:"art. 2 pkt 7 ustawy o VAT; IOSS dla przesyłek do 150 EUR"},
+      },
     },
-    b2c: {
-      ue: {tag:"VAT PL (zasada)", col:"#8a2e2a", title:"Usługa dla konsumenta z UE", rate:"Co do zasady VAT polski",
-        desc:"Zasada ogólna: miejsce opodatkowania to siedziba usługodawcy, czyli Polska — stosujesz polską stawkę.",
-        warunki:["Wyjątek: usługi elektroniczne, telekomunikacyjne i nadawcze (TBE) — VAT kraju konsumenta powyżej progu 10 000 EUR, przez OSS","Wyjątek: usługi związane z nieruchomością — VAT kraju nieruchomości","Inne wyjątki: transport, wstęp na imprezy, gastronomia"],
-        podstawa:"art. 28c ustawy o VAT (wyjątki: art. 28e-28n)"},
-      poza: {tag:"Zależy od usługi", col:"#8a2e2a", title:"Usługa dla konsumenta spoza UE", rate:"Zasada: VAT polski; częste wyjątki",
-        desc:"Zasada ogólna to polski VAT (siedziba usługodawcy), ale dla wielu usług niematerialnych opodatkowanie jest w kraju konsumenta.",
-        warunki:["Wyjątek: usługi niematerialne (doradcze, prawne, reklamowe, licencje, IT) dla konsumenta spoza UE — opodatkowane w kraju konsumenta, bez polskiego VAT","Wyjątek: usługi elektroniczne dla konsumenta spoza UE — poza polskim VAT","Usługi związane z nieruchomością — VAT kraju nieruchomości"],
-        podstawa:"art. 28c oraz art. 28l ustawy o VAT"},
+    usluga: {
+      b2b: {
+        ue: {tag:"Import usług", col:"#6b4a8a", title:"Import usług z UE (odwrotne obciążenie)", rate:"VAT rozliczasz w PL",
+          kto:"Zagraniczny usługodawca wystawia fakturę bez VAT, a Ty (polski nabywca) rozliczasz VAT w Polsce — należny i naliczony (zwykle neutralnie).",
+          przyklad:"Faktura 4 000 zł od firmy z Irlandii → VAT należny 920 zł i naliczony 920 zł, neutralnie.",
+          warunki:["Miejsce opodatkowania to Polska (siedziba nabywcy, zasada B2B)","Wykazujesz VAT należny i naliczony w deklaracji","Transakcję ujmujesz w ewidencji jako import usług"],
+          podstawa:"art. 28b oraz art. 17 ust. 1 pkt 4 ustawy o VAT"},
+        poza: {tag:"Import usług", col:"#6b4a8a", title:"Import usług spoza UE (odwrotne obciążenie)", rate:"VAT rozliczasz w PL",
+          kto:"Usługodawca z państwa trzeciego wystawia fakturę bez VAT, a Ty (polski nabywca) rozliczasz VAT w Polsce — należny i naliczony.",
+          przyklad:"Faktura 4 000 zł od firmy z USA → VAT należny 920 zł i naliczony 920 zł.",
+          warunki:["Miejsce opodatkowania to Polska (siedziba nabywcy)","Rozliczasz jak import usług (odwrotne obciążenie)","Nie wykazujesz w informacji podsumowującej VAT-UE"],
+          podstawa:"art. 28b oraz art. 17 ust. 1 pkt 4 ustawy o VAT"},
+      },
+      b2c: {
+        ue: {tag:"VAT w cenie", col:"#8a2e2a", title:"Usługa z UE jako osoba prywatna", rate:"VAT już w cenie",
+          kto:"Nie masz obowiązków VAT. Przy usługach elektronicznych zagraniczny dostawca dolicza polski VAT (przez OSS) — płacisz go w cenie.",
+          przyklad:"Subskrypcja streamingu z Irlandii 40 zł/mc → polski VAT 23% już w cenie.",
+          warunki:["Usługi elektroniczne (streaming, aplikacje) — dostawca rozlicza polski VAT przez OSS","Inne usługi — VAT zależy od rodzaju, zwykle kraju usługodawcy"],
+          podstawa:"art. 28k ustawy o VAT (usługi TBE B2C)"},
+        poza: {tag:"VAT w cenie", col:"#8a2e2a", title:"Usługa spoza UE jako osoba prywatna", rate:"VAT w cenie (usługi elektroniczne)",
+          kto:"Przy usługach elektronicznych dostawca spoza UE powinien zarejestrować się i doliczyć polski VAT. Płacisz go w cenie, bez własnych formalności.",
+          przyklad:"Aplikacja od firmy z USA 50 zł → polski VAT w cenie, jeśli dostawca rozlicza OSS.",
+          warunki:["Usługi elektroniczne dla konsumenta z UE — opodatkowane w kraju konsumenta (Polska)","Dostawca spoza UE rozlicza je przez procedurę nieunijną OSS"],
+          podstawa:"art. 28k ustawy o VAT"},
+      },
     },
   },
 };
-let xbT="towar", xbC="b2b", xbW="ue";
+let xbDir="out", xbT="towar", xbC="b2b", xbW="ue", xbRev=15000;
 function vatXbRender(){
   const out=$("#vatXbResult"); if(!out) return;
-  const d=VAT_XB[xbT][xbC][xbW]; if(!d) return;
+  const inbound=(xbDir==="in");
+  const cl=$("#xbCLbl"); if(cl) cl.textContent=inbound?"Kto kupuje":"Komu";
+  const tl=$("#xbTLbl"); if(tl) tl.textContent=inbound?"Co kupujesz":"Co sprzedajesz";
+  const wl=$("#xbWLbl"); if(wl) wl.textContent=inbound?"Skąd":"Dokąd";
+  const d = inbound ? VAT_XB.in[xbT][xbC][xbW] : VAT_XB.out[xbT][xbC][xbW];
+  if(!d) return;
+  const thrNote = d.thrNote ? `<div class="vat-thr-note">${esc(d.thrNote)}</div>` : "";
+  const extra = d.threshold ? `<div class="vat-xb-thr">${thrNote}
+      <label class="vat-thr-lbl" for="xbRev">Twoja roczna sprzedaż do konsumentów w UE (EUR)</label>
+      <input id="xbRev" class="vat-input" type="number" inputmode="decimal" min="0" step="any" value="${xbRev}">
+      <div id="xbThrOut"></div></div>` : "";
+  const links = d.links ? `<div class="vat-xb-links">${d.links.map(x=>`<a class="vat-xb-link" href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.l)} ↗</a>`).join("")}</div>` : "";
   out.innerHTML=`<div class="vat-xb-res">
     <div class="vat-xb-head"><span class="vat-badge" style="background:${d.col}">${esc(d.tag)}</span><span class="vat-xb-title">${esc(d.title)}</span></div>
-    <div class="vat-xb-rate">Twój VAT: <b>${esc(d.rate)}</b></div>
-    <div class="vat-xb-desc">${esc(d.desc)}</div>
+    <div class="vat-xb-rate">Stawka / zasada: <b>${esc(d.rate)}</b></div>
+    <div class="vat-xb-kto"><b>Kto płaci VAT:</b> ${esc(d.kto)}</div>
+    <div class="vat-xb-ex"><b>Przykład:</b> ${esc(d.przyklad)}</div>
+    ${extra}
     <ul class="vat-xb-warunki">${d.warunki.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>
+    ${links}
     <div class="vat-xb-podst">Podstawa: ${esc(d.podstawa)}</div>
   </div>`;
+  if(d.threshold){
+    const ri=$("#xbRev");
+    if(ri) ri.addEventListener("input",()=>{ xbRev=parseFloat((ri.value||"").replace(",","."))||0; xbThrUpdate(); });
+    xbThrUpdate();
+  }
+}
+function xbThrUpdate(){
+  const o=$("#xbThrOut"); if(!o) return;
+  o.innerHTML = (xbRev>10000)
+    ? `<div class="vat-thr-res vat-thr-over"><b>Powyżej 10 000 EUR</b> — naliczasz <b>VAT kraju konsumenta</b> i rozliczasz go przez <b>VAT-OSS</b> (jedna deklaracja w Polsce). Polski VAT już nie wystarcza.</div>`
+    : `<div class="vat-thr-res vat-thr-under"><b>Do 10 000 EUR</b> — możesz stosować <b>polski VAT</b> (rejestracja do OSS nie jest konieczna).</div>`;
 }
 function renderVAT(){
   const box=$("#vatBox"); if(!box || box.dataset.done) return;
   box.dataset.done="1";
   box.innerHTML=`
+    <div class="vat-tool">
+      <div class="vat-th">Transakcje zagraniczne — jaki VAT?</div>
+      <p class="vat-sub">Z perspektywy polskiej strony (firmy lub osoby prywatnej), w obie strony. Rozróżnia transakcje wewnątrz UE i z państwami trzecimi (np. UK, USA).</p>
+      <div class="vat-xb-row"><span class="vat-xb-lbl">Kierunek</span><div id="xbDir" class="srcToggle"><button class="srcbtn on" data-xbdir="out">Sprzedaję z Polski</button><button class="srcbtn" data-xbdir="in">Kupuję do Polski</button></div></div>
+      <div class="vat-xb-row"><span class="vat-xb-lbl" id="xbTLbl">Co sprzedajesz</span><div id="xbT" class="srcToggle"><button class="srcbtn on" data-xbt="towar">Towar</button><button class="srcbtn" data-xbt="usluga">Usługa</button></div></div>
+      <div class="vat-xb-row" id="xbCRow"><span class="vat-xb-lbl" id="xbCLbl">Komu</span><div id="xbC" class="srcToggle"><button class="srcbtn on" data-xbc="b2b">Firma (podatnik)</button><button class="srcbtn" data-xbc="b2c">Konsument</button></div></div>
+      <div class="vat-xb-row"><span class="vat-xb-lbl" id="xbWLbl">Dokąd</span><div id="xbW" class="srcToggle"><button class="srcbtn on" data-xbw="ue">Kraj UE</button><button class="srcbtn" data-xbw="poza">Poza UE</button></div></div>
+      <div id="vatXbResult"></div>
+      <p class="vat-caveat">Schemat liczy VAT <b>po stronie polskiej</b> — co rozliczasz w Polsce. Jeśli masz firmę za granicą i pytasz o jej tamtejszy VAT, to już przepisy tego kraju (tu ich nie wyliczam). Przy wyborze „Firma (podatnik)" zakładam czynnego podatnika VAT. To uproszczone zasady ogólne — są wyjątki (nieruchomości, usługi elektroniczne, transport, montaż na miejscu). Pewność daje WIS lub doradca.</p>
+    </div>
     <div class="vat-tool">
       <div class="vat-th">Weryfikator stawki VAT (Polska)</div>
       <p class="vat-sub">Wpisz towar lub usługę, a podpowiem najbardziej prawdopodobną polską stawkę. To wskazówka, nie wiążąca interpretacja.</p>
@@ -2652,15 +2775,6 @@ function renderVAT(){
       <p class="vat-sub">Cały świat — ponad 130 państw pogrupowanych regionami. Stawka standardowa i obniżone. Stan: styczeń 2026 (orientacyjnie).</p>
       <select id="vatCountry" class="vat-input"></select>
       <div id="vatCountryResult"></div>
-    </div>
-    <div class="vat-tool">
-      <div class="vat-th">Sprzedaż z Polski za granicę — jaki VAT?</div>
-      <p class="vat-sub">Schemat transakcji transgranicznych: co sprzedajesz, komu i dokąd. Rozróżnia transakcje wewnątrz UE i z państwami trzecimi (np. UK, USA).</p>
-      <div class="vat-xb-row"><span class="vat-xb-lbl">Co sprzedajesz</span><div id="xbT" class="srcToggle"><button class="srcbtn on" data-xbt="towar">Towar</button><button class="srcbtn" data-xbt="usluga">Usługa</button></div></div>
-      <div class="vat-xb-row"><span class="vat-xb-lbl">Komu</span><div id="xbC" class="srcToggle"><button class="srcbtn on" data-xbc="b2b">Firma (podatnik)</button><button class="srcbtn" data-xbc="b2c">Konsument</button></div></div>
-      <div class="vat-xb-row"><span class="vat-xb-lbl">Dokąd</span><div id="xbW" class="srcToggle"><button class="srcbtn on" data-xbw="ue">Kraj UE</button><button class="srcbtn" data-xbw="poza">Poza UE</button></div></div>
-      <div id="vatXbResult"></div>
-      <p class="vat-caveat">To uproszczony schemat zasad ogólnych. Są wyjątki (m.in. usługi związane z nieruchomościami, elektroniczne, transport, montaż na miejscu). W razie wątpliwości — WIS albo doradca podatkowy.</p>
     </div>`;
   const ex=["książka","nocleg w hotelu","usługi księgowe","chleb","kawa","fryzjer","leki","eksport"];
   $("#vatExamples").innerHTML=ex.map(e=>`<button class="vat-chip" data-vex="${esc(e)}">${esc(e)}</button>`).join("");
@@ -2677,6 +2791,7 @@ function renderVAT(){
   vatShowCountry();
   const xbWire=(id,attr,set)=>{ document.querySelectorAll(`#${id} .srcbtn`).forEach(b=>b.onclick=()=>{
     set(b.dataset[attr]); document.querySelectorAll(`#${id} .srcbtn`).forEach(x=>x.classList.toggle("on",x===b)); vatXbRender(); }); };
+  xbWire("xbDir","xbdir",v=>xbDir=v);
   xbWire("xbT","xbt",v=>xbT=v);
   xbWire("xbC","xbc",v=>xbC=v);
   xbWire("xbW","xbw",v=>xbW=v);
@@ -2722,7 +2837,6 @@ function renderStawki(){
   }
   renderSciagaCustom();
   renderZus();
-  renderVAT();
   return 0;
 }
 function renderZus(){
@@ -3083,6 +3197,7 @@ function render(){
   else if(state.tab==="terminy") c=renderTerminy();
   else if(state.tab==="kursy") c=renderKursy();
   else if(state.tab==="stawki") c=renderStawki();
+  else if(state.tab==="vat"){ renderVAT(); c=0; }
   else if(state.tab==="kalk"){ renderKalk(); renderEtat(); renderJdgUop(); renderOsobowa(); renderKomandyt(); renderSpzoo(); renderLacznie(); c=0; }
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
@@ -3093,10 +3208,10 @@ function render(){
 
 // --- generyczny mechanizm podzakladek (jedna logika dla Ustaw, Terminow, Kursow, Stawek) ---
 const SUBTABS = {
-  legis:   [["proc","W trakcie procedowania","#rclView"], ["wchodza","Wkrótce wchodzą / opublikowane","#legisView"]],
+  legis:   [["proc","W trakcie procedowania","#rclView"], ["wchodza","Wchodzą w życie","#legisSoonView"], ["dziennik","Sejm i Dziennik Ustaw","#legisView"]],
   terminy: [["lista","Terminy","#terminyMain"], ["kalk","Kalkulator terminu","#termCalcWrap"]],
   kursy:   [["kursy","Kursy walut","#kursyRates"], ["kalk","Przelicznik walut","#kursyConv"]],
-  stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"], ["vat","VAT","#stawkiVat"]],
+  stawki:  [["sciaga","Ściągawka","#stawkiSciaga"], ["zus","Stawki ZUS","#stawkiZus"]],
   kalk:    [["jdg","JDG","#kalkJdg"], ["etat","Etat","#kalkEtat"], ["jdguop","JDG + etat","#kalkJdgUop"], ["osobowa","Spółka osobowa","#kalkOsobowa"], ["komandyt","Komandytowa","#kalkKomandyt"], ["spzoo","Spółka z o.o.","#kalkSpzoo"], ["lacznie","Łączne (skala)","#kalkLacznie"]],
 };
 function fillSubBars(){
@@ -3119,11 +3234,11 @@ function applySub(tab){
 const SECTIONS = [
   ["news",      "Wiadomości", ["news"]],
   ["terminy",   "Terminy",    ["terminy"]],
-  ["narzedzia", "Narzędzia",  ["kursy","stawki","kalk"]],
+  ["narzedzia", "Narzędzia",  ["kursy","stawki","vat","kalk"]],
   ["prawo",     "Prawo",      ["legis","wyroki","kis"]],
   ["moje",      "Moje",       ["moje"]],
 ];
-const MEMBER_LABEL = {news:"Wiadomości", terminy:"Terminy", kursy:"Kursy", stawki:"Stawki", kalk:"Kalkulator", legis:"Ustawy", wyroki:"Wyroki", kis:"Interpretacje", moje:"Moje"};
+const MEMBER_LABEL = {news:"Wiadomości", terminy:"Terminy", kursy:"Kursy", stawki:"Stawki", vat:"VAT", kalk:"Kalkulator", legis:"Ustawy", wyroki:"Wyroki", kis:"Interpretacje", moje:"Moje"};
 let lastMem = {narzedzia:"kursy", prawo:"legis"};
 function sectionOf(tab){ const s=SECTIONS.find(x=>x[2].includes(tab)); return s?s[0]:"news"; }
 function fillMemberBar(sec, activeTab){
@@ -3154,11 +3269,12 @@ function switchTab(t){
   $("#terminyView").hidden = t!=="terminy";
   $("#kursyView").hidden = t!=="kursy";
   $("#stawkiView").hidden = t!=="stawki";
+  $("#vatView").hidden = t!=="vat";
   $("#kalkView").hidden = t!=="kalk";
-  // Ustawy: pasek podzakladek + dwa widoki na poziomie glownym
+  // Ustawy: pasek podzakladek + trzy widoki na poziomie glownym
   const inLegis=(t==="legis");
   $("#legisSubBar").hidden = !inLegis;
-  if(inLegis){ applySub("legis"); } else { $("#legisView").hidden=true; $("#rclView").hidden=true; }
+  if(inLegis){ applySub("legis"); } else { $("#legisView").hidden=true; $("#legisSoonView").hidden=true; $("#rclView").hidden=true; }
   // zakladki z podzakladkami wewnatrz sekcji
   if(t==="terminy") applySub("terminy");
   if(t==="kursy") applySub("kursy");
@@ -3179,13 +3295,7 @@ function switchTab(t){
   $("#searchR").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchRCL(); } });
   $("#wyrokiBtn").onclick=searchWyroki;
   $("#searchW").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchWyroki(); } });
-  document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(b=>b.onclick=()=>{
-    state.wyrokiSrc=b.dataset.src;
-    document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(x=>x.classList.toggle("on",x===b));
-    const f=$("#wyrFilters"); if(f) f.style.display=(state.wyrokiSrc==="cbosa")?"none":"";
-    const inp=$("#searchW"); if(inp&&inp.value.trim().length>=2) searchWyroki();
-  });
-  ["#wyrFrom","#wyrTo","#wyrType","#wyrSort"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",()=>{ if(wyrCtx && state.wyrokiSrc!=="cbosa") searchWyroki(); }); });
+  ["#wyrFrom","#wyrTo","#wyrType","#wyrSort","#wyrPhrase"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",()=>{ if(wyrCtx) searchWyroki(); }); });
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll("[data-section]").forEach(b=>b.onclick=()=>switchSection(b.dataset.section));
