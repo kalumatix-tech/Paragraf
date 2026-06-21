@@ -50,7 +50,8 @@ def rcl_status(page_text):
     if not page_text:
         return None
     low = page_text.lower()
-    if re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low:
+    if (re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low
+            or re.search(r"kontynuowan[ya]\s+(?:pod\s+nr|jako)", low)):
         return "became_law"
     if "na stronach sejmu" in low or "dalszy ciąg procesu legislacyjnego" in low:
         return "left"
@@ -67,7 +68,8 @@ def rcl_became_law(page_text):
     low = flat.lower()
     is_law = re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) is not None
     merged = "dołączono do projektu" in low
-    if not (is_law or merged):
+    continued = re.search(r"kontynuowan[ya]\s+(?:pod\s+nr|jako)", low) is not None
+    if not (is_law or merged or continued):
         return None
     poz = year = None
     mp = re.search(r"dz\.?\s*u\.?.{0,60}?poz\.?\s*0*(\d{1,5})", low)

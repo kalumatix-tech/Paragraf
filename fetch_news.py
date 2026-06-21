@@ -493,8 +493,9 @@ def _rcl_status(page_text):
     if not page_text:
         return None
     low = page_text.lower()
-    if re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low:
-        return "became_law"      # zakonczony: stal sie ustawa / dolaczony do innego projektu
+    if (re.search(r"sta[łl]a?\s*si[ęe]\s*ustaw", low) or "dołączono do projektu" in low
+            or re.search(r"kontynuowan[ya]\s+(?:pod\s+nr|jako)", low)):
+        return "became_law"      # zakonczony: stal sie ustawa / dolaczony / kontynuowany pod innym nr
     if "na stronach sejmu" in low or "dalszy ciąg procesu legislacyjnego" in low:
         return "left"
     if re.search(r"status projektu:\s*zamkn", low):
@@ -922,6 +923,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   .lcard.is-left{border-left-color:#1d3a6b}
   .lcard.is-done{border-left-color:#1b6e4f}
   .lnote-done{color:#0f5c3a;background:rgba(27,110,79,.08);font-weight:600}
+  .lnote-warn{color:#8a5a00;background:rgba(180,120,0,.10);font-weight:600}
   /* rozwijana karta etapów rządowych (RCL) */
   .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
@@ -972,6 +974,12 @@ TEMPLATE = r'''<!DOCTYPE html>
   .kis-alt{font-size:12.5px;color:var(--ink-soft)}
   .kis-alt a{color:var(--accent);text-decoration:none;font-weight:600}
   .kis-alt a:hover{text-decoration:underline}
+  .srcToggle{display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap}
+  .srcbtn{flex:1 1 auto;min-width:160px;padding:8px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-soft);font-size:12px;font-weight:600;cursor:pointer;
+    font-family:inherit;transition:.15s;text-align:center}
+  .srcbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .srcbtn.on{background:var(--accent);border-color:var(--accent);color:#f3e9df}
   .tabbadge{display:none;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);
     color:#f3e9df;font-size:10px;font-weight:700;line-height:17px;text-align:center;margin-left:6px;vertical-align:middle}
   .tabbadge.show{display:inline-block}
@@ -1049,11 +1057,15 @@ TEMPLATE = r'''<!DOCTYPE html>
 
     <section id="wyrokiView" hidden>
       <div class="controls">
+        <div class="srcToggle" id="wyrokiSrc">
+          <button class="srcbtn on" data-src="saos">SAOS — sądy powszechne, SN, TK, KIO</button>
+          <button class="srcbtn" data-src="cbosa">CBOSA — NSA/WSA (podatkowe)</button>
+        </div>
         <div class="searchrow">
           <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: VAT, ulga, koszty, zwolnienie…  (Enter)" autocomplete="off">
-          <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen w bazie SAOS">Szukaj</button>
+          <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen">Szukaj</button>
         </div>
-        <p class="livehint">Wyszukiwanie po haśle w treści orzeczeń — baza <b>SAOS</b> (sądy powszechne, Sąd Najwyższy, TK, KIO). Orzeczeń sądów administracyjnych (NSA/WSA) tu nie ma — te są w <a href="https://orzeczenia.nsa.gov.pl" target="_blank" rel="noopener">CBOSA</a>.</p>
+        <p class="livehint"><b>SAOS</b> ma API, więc wyniki pokazuję tu w aplikacji — ale to sądy powszechne/SN/TK/KIO, <b>bez podatkowych</b>. Sprawy podatkowe (NSA/WSA) są w <b>CBOSA</b>, która blokuje automatyczny dostęp i nie ma API — dlatego dla niej kopiuję frazę i otwieram jej wyszukiwarkę.</p>
       </div>
       <div id="wyrokiResults"></div>
     </section>
@@ -1084,7 +1096,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[] };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos" };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
@@ -1199,7 +1211,9 @@ function rclBecameLaw(t){
   const low=flat.toLowerCase();
   const isLaw=/sta[łl]a?\s*si[ęe]\s*ustaw/.test(low);
   const merged=/do[łl][aą]czono do projektu/.test(low);
-  if(!isLaw && !merged) return null;
+  const contM=low.match(/kontynuowan[ya]\s+(?:pod\s+nr\.?\s*|jako\s*)([a-z]{1,3}\s?\d{1,4})/);
+  const continued=!!contM;
+  if(!isLaw && !merged && !continued) return null;
   let poz=null, year=null;
   const mp=low.match(/dz\.?\s*u\.?[\s\S]{0,60}?poz\.?\s*0*(\d{1,5})/);
   if(mp) poz=mp[1];
@@ -1208,7 +1222,22 @@ function rclBecameLaw(t){
   if(my) year=my[1];
   const link=(poz && year) ? `http://dziennikustaw.gov.pl/DU/${year}/${poz}` : null;
   const ref=(year&&poz) ? `Dz.U. ${year} poz. ${poz}` : (poz ? `Dz.U. poz. ${poz}` : "");
-  return {isLaw, merged, poz, year, link, ref};
+  const contNum=contM?contM[1].toUpperCase().replace(/\s+/g,""):null;
+  const contLink=contNum?`https://legislacja.rcl.gov.pl/lista?typeId=2&number=${encodeURIComponent(contNum)}`:null;
+  return {isLaw, merged, continued, contNum, contLink, poz, year, link, ref};
+}
+// Najpozniejsza data etapu (DD-MM-YYYY) -> Date; sluzy do wykrycia "martwych" projektow.
+function rclLatestDate(stages){
+  if(!stages||!stages.length) return null;
+  let best=null;
+  for(const s of stages){
+    if(!s.date) continue;
+    const m=String(s.date).match(/(\d{2})-(\d{2})-(\d{4})/);
+    if(!m) continue;
+    const d=new Date(+m[3],+m[2]-1,+m[1]);
+    if(!best||d>best) best=d;
+  }
+  return best;
 }
 const RCL_STAGE_KW=["lobbing","uzgodnie","konsultacj","opiniowan","komitet","komisj","rada ministr","radzie ministr","potwierdz","skierowan","notyfikacj","rozpatrz","przyjęc","przyjet"];
 function rclStages(text){
@@ -1236,7 +1265,10 @@ function legisCard(it){
   const type = it.type || ((it.src||"").indexOf("RCL")>=0 ? "rcl" : "ustawa");
   const mini = {type, title:it.title, link:it.link, src:it.src, stage:it.stage||"", step:it.step||1};
   let body;
-  if(it.became){
+  if(it.continued){
+    const cl = it.contLink ? `<a class="rp-link" href="${esc(it.contLink)}" target="_blank" rel="noopener">Znajdź kontynuację${it.contNum?" ("+esc(it.contNum)+")":""} w RCL →</a>` : "";
+    body = `<div class="lnote lnote-done">✓ ${esc(it.stage||"Zakończony — kontynuowany pod innym numerem")}</div>${cl}<a class="rp-link" href="${esc(it.link)}" target="_blank" rel="noopener">Szczegóły w RCL →</a>`;
+  } else if(it.became){
     const dz = it.dzuLink
       ? `<a class="rp-link" href="${esc(it.dzuLink)}" target="_blank" rel="noopener">Zobacz ustawę w Dz.U.${it.dzuRef?" ("+esc(it.dzuRef)+")":""} →</a>`
       : "";
@@ -1244,12 +1276,13 @@ function legisCard(it){
     body = `<div class="lnote lnote-done">✓ ${esc(it.stage||"Zakończony — stał się ustawą")}</div>${ref}${dz}<a class="rp-link" href="${esc(it.link)}" target="_blank" rel="noopener">Szczegóły w RCL →</a>`;
   } else if(it.stages && it.stages.length){
     const cur = it.stages.find(s=>s.state==="cur") || it.stages[it.stages.length-1];
+    const staleWarn = it.stale ? `<div class="lnote lnote-warn">⚠ Brak nowych etapów od ${esc(it.staleDate||"dawna")} — projekt może być nieaktywny lub już zakończony. Sprawdź w RCL.</div>` : "";
     body = `<details class="rclproc">
       <summary><span class="rp-now">W rządzie: ${esc(cur?cur.name:"—")}</span><span class="rp-tog">etapy</span></summary>
       <ol class="rp-list">${it.stages.map(s=>`<li class="rp-${s.state}">${esc(s.name)}${s.date?`<i>${esc(s.date)}</i>`:""}</li>`).join("")}</ol>
-    </details>`;
+    </details>${staleWarn}`;
   } else if(it.left){
-    body = stepper(1, true) + `<div class="lnote">→ projekt opuścił etap rządowy; dalszy ciąg w Sejmie / Dz.U. (sprawdź na stronie projektu)</div>`;
+    body = stepper(1, true) + `<div class="lnote">→ Projekt opuścił etap rządowy — dalszy ciąg w Sejmie (lub już w Dz.U.).</div><a class="rp-link" href="${esc(it.link)}" target="_blank" rel="noopener">Szczegóły / dalszy ciąg w RCL →</a>`;
   } else if(it.closed){
     body = stageLine;
   } else if(isRclGov){
@@ -1257,7 +1290,7 @@ function legisCard(it){
   } else {
     body = stepper(it.step||1) + stageLine;
   }
-  return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''} ${it.became?'is-done':''}" style="--ccol:${it.color}">
+  return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''} ${(it.became||it.continued)?'is-done':''}" style="--ccol:${it.color}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lright"><span class="lwhen">${esc(when)}</span>${addbtn(mini)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
     ${body}
@@ -1326,6 +1359,13 @@ async function searchDU(){
 }
 
 // RCL — wyszukiwanie projektów rządowych w zakładce „RCL"
+// Tokenizacja zapytania na znaczace RDZENIE slow - lapie odmiane (np. "artystow" -> "artyst" -> "artystyczny").
+const RCL_STOP=new Set(["dla","o","i","oraz","albo","lub","na","do","od","po","za","we","ze","przy","ustawa","ustawy","ustawie","projekt","projektu","prawo","prawa","zmianie","zmiany","niektorych","osob","oraz"]);
+function rclStems(q){
+  const words=q.toLowerCase().split(/[^a-ząćęłńóśźż0-9]+/).filter(w=>w.length>=4 && !RCL_STOP.has(w));
+  const stems=words.map(w=>w.length>6 ? w.slice(0,w.length-2) : w);
+  return [...new Set(stems)].slice(0,4);
+}
 async function searchRCL(){
   const q=(state.qR||$("#searchR").value||"").trim();
   const box=$("#rclResults"), btn=$("#rclBtn");
@@ -1334,40 +1374,49 @@ async function searchRCL(){
   btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam projektów w RCL…</div>`;
   const out=[];
   try{
-    const rclQ=numLike ? "number="+encodeURIComponent(q.replace(/\s+/g,"").toUpperCase())
-                       : "title="+encodeURIComponent(q);
-    const htmlTxt=await getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&${rclQ}`);
-    const cand=[];
-    if(htmlTxt){
-      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m; const seen=new Set();
+    const queries = numLike
+      ? ["number="+encodeURIComponent(q.replace(/\s+/g,"").toUpperCase())]
+      : (rclStems(q).length ? rclStems(q) : [q]).map(s=>"title="+encodeURIComponent(s));
+    const htmls = await Promise.all(queries.map(qq=>getText(`https://legislacja.rcl.gov.pl/lista?typeId=2&${qq}`)));
+    const cand=[]; const seen=new Set();
+    for(const htmlTxt of htmls){
+      if(!htmlTxt) continue;
+      const re=/href="(\/projekt\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g; let m;
       while((m=re.exec(htmlTxt))){
         if(seen.has(m[1])) continue; seen.add(m[1]);
         const t=m[2].replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
         if(t.length<6) continue;
         cand.push({title:t, link:"https://legislacja.rcl.gov.pl"+m[1]});
-        if(cand.length>=12) break;
+        if(cand.length>=16) break;
       }
+      if(cand.length>=16) break;
     }
     // strony projektów pobieramy RÓWNOLEGLE (szybko)
     const pages=await Promise.all(cand.map(c=>getText(c.link)));
+    const TWO_Y = Date.now() - 1000*60*60*24*365*2;
     cand.forEach((c,i)=>{
       const page=pages[i]; const st=rclStatus(page); const bl=rclBecameLaw(page);
       const base={type:"rcl", title:c.title, link:c.link, src:"Rząd (RCL)", color:"#8a5a2e", step:1, _d:null};
-      if(bl && bl.isLaw)           out.push({...base, became:true, dzuLink:bl.link, dzuRef:bl.ref, stage:"Zakończony — stał się ustawą"});
-      else if(bl && bl.merged)     out.push({...base, became:true, dzuLink:null, dzuRef:"", stage:"Zakończony — dołączony do innego projektu"});
-      else if(st==="in_gov")       out.push({...base, stage:"Prace w rządzie", stages:rclStages(page)});
-      else if(st==="left"  && numLike) out.push({...base, left:true,  stage:"Etap rządowy zakończony"});
+      if(bl && bl.isLaw)            out.push({...base, became:true, dzuLink:bl.link, dzuRef:bl.ref, stage:"Zakończony — stał się ustawą"});
+      else if(bl && bl.continued)   out.push({...base, continued:true, contLink:bl.contLink, contNum:bl.contNum, stage:"Zakończony — kontynuowany pod innym numerem"});
+      else if(bl && bl.merged)      out.push({...base, became:true, dzuLink:null, dzuRef:"", stage:"Zakończony — dołączony do innego projektu"});
+      else if(st==="in_gov"){
+        const stages=rclStages(page); const last=rclLatestDate(stages);
+        const stale = last ? (last.getTime() < TWO_Y) : false;
+        out.push({...base, stage:"Prace w rządzie", stages, stale, staleDate: (stale&&last)?last.toLocaleDateString("pl-PL"):""});
+      }
+      else if(st==="left")         out.push({...base, left:true,  stage:"Przekazany do Sejmu (etap rządowy zakończony)"});
       else if(st==="closed"&& numLike) out.push({...base, closed:true, stage:"Zamknięty (etap rządowy)"});
       else if(!st)                 out.push({...base, stage:"Etap rządowy — sprawdź w RCL"});
-      // przy szukaniu PO SŁOWIE: zakończone/przekazane do Sejmu pomijamy (nieważne),
-      // ale "stał się ustawą" pokazujemy ZAWSZE (to ważny, prawdziwy wynik).
+      // Po SŁOWIE pokazujemy: w toku, "stał się ustawą", "kontynuowany" ORAZ przekazane do Sejmu
+      // (te ostatnie to czesto najwazniejsze - projekt idzie dalej). Pomijamy tylko "zamkniete".
     });
   }catch(e){}
   btn.disabled=false;
   if(!out.length){
     const hint=numLike
       ? ` Jeśli to numer (np. UD116) — sprawdź pisownię. Pusto się powtarza? Przekaźnik mógł nie odpowiedzieć, kliknij raz jeszcze.`
-      : ` Pokazuję tylko projekty w toku — możliwe, że o tej frazie nie ma teraz aktywnego projektu w rządzie (albo RCL nie złapał odmiany słowa).`;
+      : ` Szukałem po rdzeniach: ${esc(rclStems(q).join(", ")||q)}. RCL bywa, że nazywa rzecz inaczej (np. „emerytura dla artystów" = „zabezpieczenie socjalne osób wykonujących zawód artystyczny") — spróbuj prostszego, rdzennego słowa (np. „artyst", „zabezpieczenie").`;
     box.innerHTML=`<div class="live-status">Nic nie znalazłem w RCL dla „${esc(q)}".${hint}</div>`;
     return;
   }
@@ -1396,6 +1445,17 @@ async function searchWyroki(){
   const q=($("#searchW").value||"").trim();
   const box=$("#wyrokiResults"), btn=$("#wyrokiBtn");
   if(q.length<2){ box.innerHTML=`<div class="live-status">Wpisz co najmniej 2 znaki.</div>`; return; }
+  // CBOSA: brak API + blokuje boty -> kopiujemy fraze i otwieramy jej wyszukiwarke.
+  if(state.wyrokiSrc==="cbosa"){
+    let copied=false;
+    try{ navigator.clipboard.writeText(q); copied=true; }catch(_){}
+    try{ window.open("https://orzeczenia.nsa.gov.pl/cbo/query", "_blank", "noopener"); }catch(_){}
+    box.innerHTML=`<div class="kis-launch">
+      <p>${copied?'Skopiowałem frazę <b>„'+esc(q)+'"</b> do schowka.':'Fraza: <b>„'+esc(q)+'"</b>.'} Otworzyłem wyszukiwarkę <b>CBOSA</b> (NSA/WSA) w nowej karcie — wklej (Ctrl+V) w pole „Szukana fraza" i naciśnij „Szukaj".</p>
+      <p class="kis-alt">CBOSA blokuje automatyczne pobieranie i nie ma API, dlatego nie da się jej wyników wciągnąć tutaj. To jedyne pełne źródło orzeczeń podatkowych (sądy administracyjne).</p>
+    </div>`;
+    return;
+  }
   btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam orzeczeń w SAOS…</div>`;
   let items=[];
   try{
@@ -1405,7 +1465,7 @@ async function searchWyroki(){
   }catch(e){}
   btn.disabled=false;
   if(!items.length){
-    box.innerHTML=`<div class="live-status">Nic nie znalazłem dla „${esc(q)}". Spróbuj innego słowa albo kliknij ponownie (przekaźnik mógł nie odpowiedzieć).</div>`;
+    box.innerHTML=`<div class="live-status">Nic nie znalazłem w SAOS dla „${esc(q)}". Uwaga: SAOS nie ma spraw podatkowych — dla nich przełącz na <b>CBOSA</b> wyżej. Albo kliknij ponownie (przekaźnik mógł nie odpowiedzieć).</div>`;
     return;
   }
   box.innerHTML=`<div class="live-sec-head">Orzeczenia (SAOS) — „${esc(q)}" (${items.length})</div><div class="lgrid">${items.map(wyrokCard).join("")}</div>`;
@@ -1557,6 +1617,11 @@ function switchTab(t){
   $("#searchR").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchRCL(); } });
   $("#wyrokiBtn").onclick=searchWyroki;
   $("#searchW").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchWyroki(); } });
+  document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(b=>b.onclick=()=>{
+    state.wyrokiSrc=b.dataset.src;
+    document.querySelectorAll("#wyrokiSrc .srcbtn").forEach(x=>x.classList.toggle("on",x===b));
+    const inp=$("#searchW"); if(inp&&inp.value.trim().length>=2) searchWyroki();
+  });
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
