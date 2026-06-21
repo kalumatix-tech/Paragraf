@@ -1097,9 +1097,9 @@ TEMPLATE = r'''<!DOCTYPE html>
     padding:9px 11px;background:rgba(176,124,42,.08);border-left:3px solid var(--accent);border-radius:0 7px 7px 0}
   /* schemat transgraniczny VAT (sprzedaz z PL za granice) */
   .vat-xb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
-  .vat-xb-lbl{flex:none;min-width:90px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);font-weight:700}
+  .vat-xb-lbl{flex:none;min-width:92px;white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);font-weight:700}
   .vat-xb-row .srcToggle{flex:1;margin-bottom:0;min-width:200px}
-  .vat-xb-row .srcbtn{min-width:0;flex:1 1 auto;padding:7px 10px;font-size:12.5px}
+  .vat-xb-row .srcbtn{min-width:0;flex:1 1 0;padding:7px 10px;font-size:12.5px;white-space:nowrap}
   .vat-xb-res{margin-top:14px;padding:14px 15px;background:var(--paper,#faf7f1);border:1px solid var(--line);border-radius:10px}
   .vat-xb-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:9px}
   .vat-xb-head .vat-badge{min-width:0;font-size:12px;font-family:var(--sans);font-weight:700;padding:5px 11px;border-radius:7px}
@@ -1799,6 +1799,25 @@ async function getText(u, fresh){
   if(v!=null) _cache.set("t"+u, v);
   return v;
 }
+// Wyscig z walidacja: bierzemy pierwsza odpowiedz, ktora przejdzie test ksztaltu.
+// Dzieki temu publiczne proxy zwracajace wlasny blad jako JSON nie "zatruwa" wyniku.
+function _raceValid(urls, validate){
+  return new Promise(resolve=>{
+    let left=urls.length, done=false;
+    if(!left){ resolve(null); return; }
+    urls.forEach(u=>{
+      fetch(u).then(r=>{ if(!r.ok) throw 0; return r.json(); })
+        .then(v=>{ if(done) return; if(!validate(v)) throw 0; done=true; resolve(v); })
+        .catch(()=>{ if(--left===0 && !done){ done=true; resolve(null); } });
+    });
+  });
+}
+async function getJSONv(u, validate, fresh){
+  if(!fresh && _cache.has("j"+u)){ const c=_cache.get("j"+u); if(validate(c)) return c; }
+  const v = await _raceValid(PXY.map(p=>p(u)), validate);
+  if(v!=null) _cache.set("j"+u, v);
+  return v;
+}
 // Dz.U./M.P. — wyszukiwanie w zakładce „Ustawy"
 async function searchDU(){
   const q=(state.qL||$("#searchL").value||"").trim();
@@ -1943,12 +1962,23 @@ async function wyrFetch(){
   if(btn) btn.disabled=true; box.innerHTML=`<div class="live-status">Szukam orzeczeń w SAOS…</div>`;
   let items=[], total=null;
   try{
-    const data=await getJSON(wyrUrl(c));
+    const data=await getJSONv(wyrUrl(c), d=>d && (Array.isArray(d.items) || (d.info && typeof d.info.totalResults==="number")));
     if(data){ if(Array.isArray(data.items)) items=data.items; if(data.info && typeof data.info.totalResults==="number") total=data.info.totalResults; }
   }catch(e){}
   if(btn) btn.disabled=false;
   if(!items.length){
-    box.innerHTML=`<div class="live-status">${c.page>0?"Brak dalszych wyników — wróć na poprzednią stronę.":'Nic nie znalazłem w SAOS dla tych kryteriów. Spróbuj innych słów, odznacz „Dokładna fraza" (wtedy szuka każdego słowa osobno) albo poszerz zakres dat. Przekaźnik mógł też nie odpowiedzieć — kliknij „Szukaj" ponownie.'}</div>`;
+    if(c.page>0){ box.innerHTML=`<div class="live-status">Brak dalszych wyników — wróć na poprzednią stronę.</div>`; return; }
+    if(total===null){
+      // pobranie na zywo zawiodlo (nie "brak wynikow") -> fallback do strony SAOS
+      box.innerHTML=`<div class="kis-launch">
+        <p>Nie udało się pobrać wyników z SAOS na żywo — serwer albo przekaźnik nie odpowiedział. To bywa chwilowe, więc najpierw kliknij <b>„Szukaj"</b> jeszcze raz.</p>
+        <p class="kis-alt">Jeśli to się powtarza, otwórz wyszukiwarkę SAOS bezpośrednio (frazę kopiuję do schowka): <button class="livebtn" id="wyrSaosOpen">Otwórz SAOS w nowej karcie</button></p>
+      </div>`;
+      const sb=$("#wyrSaosOpen");
+      if(sb) sb.onclick=()=>{ try{ navigator.clipboard.writeText(c.q||""); }catch(_){}; try{ window.open("https://www.saos.org.pl/search","_blank","noopener"); }catch(_){} };
+    } else {
+      box.innerHTML=`<div class="live-status">Nic nie znalazłem w SAOS dla tych kryteriów. Spróbuj innych słów, odznacz „Dokładna fraza" (wtedy szuka każdego słowa osobno) albo poszerz zakres dat.</div>`;
+    }
     return;
   }
   const totalPages = total!=null ? Math.max(Math.ceil(total/20),1) : null;
@@ -2559,7 +2589,7 @@ const VAT_RULES=[
   {rate:"8%", cat:"gastronomia", kw:["restauracj","gastronom","catering","posilek","obiad","kawiarni","pizzeri","jadlodajni"], note:"Usługi gastronomiczne — 8%. Ale napoje (kawa, soki) i alkohol w rachunku — 23%."},
   {rate:"8%", cat:"hotele i noclegi", kw:["hotel","nocleg","pensjonat","hostel","zakwaterowan","apartament"], note:"Usługi hotelarskie i noclegowe — 8%."},
   {rate:"8%", cat:"transport pasażerski", kw:["transport osob","przewoz osob","transport pasazer","bilet","taksowk","komunikacj"], note:"Przewóz osób — 8%. Taksówki na ryczałcie mają szczególną stawkę 4%."},
-  {rate:"8%", cat:"usługi fryzjerskie i kosmetyczne", kw:["fryzjer","manicure","pedicure","paznokc","kosmetyczn","depilac"], note:"Usługi fryzjerskie i kosmetyczne (PKWiU 96.02) — 8% od kwietnia 2024. Same kosmetyki jako towar — 23%."},
+  {rate:"8%", cat:"usługi fryzjerskie i kosmetyczne", kw:["fryzjer","manicure","pedicure","paznokc","kosmetycz","depilac","uroda","urody","beauty","wizaz","henna","rzes","brwi","laminacj","makijaz permanentny","salon urody","salon kosmetyc","salon fryzjer"], note:"Usługi fryzjerskie i kosmetyczne (PKWiU 96.02), w tym kosmetyczka, manicure, depilacja — 8% od kwietnia 2024. Same kosmetyki jako towar — 23%."},
   {rate:"8%", cat:"leki i wyroby medyczne", kw:["leki","lekarstw","lecznicz","farmaceut","wyrob medyczn","wyroby medyczn","sprzet medyczn","odkaza"], note:"Produkty lecznicze i wyroby medyczne z wykazu — 8%."},
   {rate:"8%", cat:"budownictwo mieszkaniowe", kw:["budownictwo mieszkan","remont mieszkan","budowa domu","mieszkani","termomoderniz","modernizacja budynk"], note:"Budowa/remont w społecznym programie mieszkaniowym (mieszkania do 150 m², domy do 300 m²) — 8%. Poza nim 23%."},
   {rate:"8%", cat:"kultura, sport, rekreacja", kw:["kino","teatr","muzeum","koncert","basen","silown","sport","rekreac","wystaw"], note:"Wstęp na wydarzenia kultury, sportu i rekreacji — 8%."},
@@ -2586,7 +2616,7 @@ function vatVerify(q){
   for(const r of VAT_RULES){
     for(let kw of r.kw){
       kw=vatStrip(kw);
-      const hit = kw.indexOf(" ")>=0 ? full.indexOf(kw)>=0 : toks.some(t=>t.indexOf(kw)===0);
+      const hit = kw.indexOf(" ")>=0 ? full.indexOf(kw)>=0 : toks.some(t=> t.indexOf(kw)===0 || (t.length>=5 && kw.indexOf(t)===0));
       if(hit) return r;
     }
   }
