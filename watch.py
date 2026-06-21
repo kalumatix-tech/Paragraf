@@ -15,6 +15,7 @@ import os
 import re
 import json
 import html
+import datetime
 import urllib.parse
 
 import requests
@@ -37,6 +38,41 @@ def _get(url, timeout=20):
     except Exception:
         pass
     return None
+
+
+def _get_json(url, timeout=20):
+    try:
+        r = requests.get(url, headers={"User-Agent": UA, "Accept": "application/json"}, timeout=timeout)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+
+def topic_matches(keyword):
+    """Akty (Dz.U./M.P.) z fraza w tytule, opublikowane w ostatnich ~45 dniach.
+    Zwraca slownik {ELI: {title, date, inforce, ref, link}}."""
+    since = (datetime.date.today() - datetime.timedelta(days=45)).isoformat()
+    out = {}
+    for pub in ("DU", "MP"):
+        url = ("https://api.sejm.gov.pl/eli/acts/search?title="
+               + urllib.parse.quote(keyword)
+               + f"&publisher={pub}&dateFrom={since}&limit=50")
+        data = _get_json(url)
+        items = (data or {}).get("items") or []
+        for a in items:
+            eli = a.get("ELI") or a.get("address")
+            if not eli:
+                continue
+            out[eli] = {
+                "title": (a.get("title") or "").strip(),
+                "date": a.get("announcementDate") or "",
+                "inforce": a.get("entryIntoForce") or "",
+                "ref": (a.get("displayAddress") or "").strip(),
+                "link": f"https://api.sejm.gov.pl/eli/acts/{eli}/text.pdf",
+            }
+    return out
 
 
 # ------------------------------------------------------- analiza strony RCL
@@ -196,9 +232,14 @@ def main():
     entries = read_watchlist()
     prev = load_state()
     first_run = not prev
-    new_state, changes, started = {}, [], []
+    new_state = {}
+    proj_started, proj_changes, topic_started, topic_news = [], [], [], []
 
-    for entry in entries:
+    projects = [e for e in entries if not e.lower().startswith("temat:")]
+    topics = [e for e in entries if e.lower().startswith("temat:")]
+
+    # --- projekty RCL / akty (jak dotychczas) ---
+    for entry in projects:
         url = resolve_url(entry)
         if not url:
             if entry in prev:               # nie znaleziono teraz — zachowaj poprzedni stan
@@ -212,32 +253,69 @@ def main():
         title = title or entry
         new_state[entry] = {"url": url, "sig": sig, "desc": desc, "title": title}
         if first_run:
-            started.append((title, desc, url))
+            proj_started.append((title, desc, url))
         else:
             old = prev.get(entry)
             if old is None:
-                changes.append((title, "(nowy na liście)", desc, url))
+                proj_changes.append((title, "(nowy na liście)", desc, url))
             elif old.get("sig") != sig:
-                changes.append((title, old.get("desc", "?"), desc, url))
+                proj_changes.append((title, old.get("desc", "?"), desc, url))
+
+    # --- tematy / dziedziny (nowe akty w Dz.U./M.P. z fraza w tytule) ---
+    for entry in topics:
+        kw = entry.split(":", 1)[1].strip()
+        if not kw:
+            continue
+        key = "temat:" + kw.lower()
+        matches = topic_matches(kw)
+        if not matches and key in prev:      # API nie odpowiedziało — zachowaj stan, nie alarmuj
+            new_state[key] = prev[key]
+            continue
+        cur_ids = sorted(matches.keys())
+        prevrec = prev.get(key)
+        if prevrec is None:                  # nowy temat — wycisz istniejace, pilnuj kolejnych
+            new_state[key] = {"topic": kw, "seen": cur_ids}
+            topic_started.append((kw, len(cur_ids)))
+        else:
+            seen = set(prevrec.get("seen") or [])
+            new_state[key] = {"topic": kw, "seen": sorted(seen | set(cur_ids))}
+            for i in cur_ids:
+                if i not in seen:
+                    topic_news.append((kw, matches[i]))
 
     json.dump(new_state, open(STATE_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
-    has_mail, subject, lines = False, "", []
-    if first_run and started:
-        has_mail = True
-        subject = f"Paragraf: zaczynam obserwować {len(started)} projekt(ów)"
-        lines.append("Od teraz pilnuję tych projektów i napiszę, gdy zmieni się etap:\n")
-        for title, desc, url in started:
-            lines.append(f"• {title}\n  stan: {desc}\n  {url}\n")
-    elif changes:
-        has_mail = True
-        n = len(changes)
-        subject = f"Paragraf: zmiana w {n} obserwowanym projekcie" + ("" if n == 1 else " (i więcej)")
-        lines.append("Zmienił się etap obserwowanych projektów:\n")
-        for title, old, new, url in changes:
-            lines.append(f"• {title}\n  było: {old}\n  jest: {new}\n  {url}\n")
+    # --- budowa maila: sklejamy tylko te sekcje, ktore maja tresc ---
+    sections, subj_bits = [], []
+    if first_run and proj_started:
+        sections.append(("Od teraz pilnuję tych projektów (napiszę, gdy zmieni się etap):",
+                         [f"• {t}\n  stan: {d}\n  {u}\n" for t, d, u in proj_started]))
+        subj_bits.append(f"{len(proj_started)} projekt(ów)")
+    if topic_started:
+        sections.append(("Od teraz pilnuję nowych aktów w tematach:",
+                         [f"• temat „{kw}” — teraz pasuje {n} akt(ów) w Dz.U./M.P.\n" for kw, n in topic_started]))
+        subj_bits.append(f"{len(topic_started)} temat(ów)")
+    if proj_changes:
+        sections.append(("Zmienił się etap obserwowanych projektów:",
+                         [f"• {t}\n  było: {o}\n  jest: {nw}\n  {u}\n" for t, o, nw, u in proj_changes]))
+        subj_bits.append(f"{len(proj_changes)} zmiana(y)")
+    if topic_news:
+        rows = []
+        for kw, m in topic_news:
+            ref = f" — {m['ref']}" if m.get("ref") else ""
+            inf = f"\n  wchodzi w życie: {m['inforce']}" if m.get("inforce") else ""
+            rows.append(f"• {m['title'] or 'akt'}{ref}\n  (temat „{kw}”){inf}\n  {m['link']}\n")
+        sections.append(("Nowe akty w obserwowanych tematach:", rows))
+        subj_bits.append(f"{len(topic_news)} nowy akt(ów) w tematach")
 
+    has_mail = bool(sections)
+    subject = ("Paragraf: " + " · ".join(subj_bits)) if has_mail else ""
+    lines = []
+    for head, rows in sections:
+        lines.append(head + "\n")
+        lines.extend(rows)
     body = ("\n".join(lines).strip() + "\n\n— Kokpit Paragraf") if has_mail else ""
+
     open(SUBJECT_FILE, "w", encoding="utf-8").write(subject)
     open(BODY_FILE, "w", encoding="utf-8").write(body)
 
@@ -247,7 +325,8 @@ def main():
             f.write(f"changes={'true' if has_mail else 'false'}\n")
             f.write(f"subject={subject}\n")
 
-    print(f"Obserwowane: {len(entries)} | zmiany: {len(changes)} | "
+    print(f"Projekty: {len(projects)} | tematy: {len(topics)} | "
+          f"zmiany: {len(proj_changes)} | nowe akty: {len(topic_news)} | "
           f"pierwsze uruchomienie: {first_run} | mail: {has_mail}")
 
 

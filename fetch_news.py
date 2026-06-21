@@ -88,6 +88,7 @@ OFFICIAL_ENABLED = True
 SEJM_TERM = 10                 # kadencja Sejmu (zmien po nowych wyborach)
 OFFICIAL_MAX = 12             # ile PROJEKTOW (druki, z etapem) bierzemy z Sejmu
 ELI_MAX = 40                  # ile OPUBLIKOWANYCH aktow (Dz.U./MP) do wyszukiwarki ustaw
+INFORCE_LOOKUP_MAX = 14       # dla ilu najnowszych aktow dociagac date wejscia w zycie (oszczednosc zapytan API)
 RCL_MAX = 20                  # ile PROJEKTOW RZADOWYCH (RCL, przed Sejmem)
 RCL_PAGES = 4                 # ile stron listy RCL przejrzec (kazda ~10 pozycji)
 OFFICIAL_MAX_AGE_DAYS = 60    # okno swiezosci dla projektow (aktywne w procesie)
@@ -633,9 +634,16 @@ def _eli_items(pub: str):
         typ = (a.get("type") or "").strip()
         sig = (a.get("displayAddress") or "").strip()
         desc = (typ + " · " + sig).strip(" ·")
+        # date wejscia w zycie jest tylko w szczegolach aktu (nie w listingu rocznym) -
+        # dociagamy ja tylko dla kilkunastu NAJNOWSZYCH aktow (tylko one moga miec date przyszla).
+        inforce = None
+        if len(out) < INFORCE_LOOKUP_MAX and len(parts) == 3:
+            detail = _api_get(f"https://api.sejm.gov.pl/eli/acts/{eli}")
+            if detail:
+                inforce = _date_iso(detail.get("entryIntoForce") or "")
         out.append({
             "title": title, "link": link, "desc": desc, "summary": "",
-            "date": date,
+            "date": date, "inforce": inforce,
             "src": meta["name"], "cat": meta["cat"], "color": meta["color"],
             "fid": "off-" + ("du" if pub == "DU" else "mp"), "official": True,
             "track": True, "step": 4, "stage": "Opublikowano",
@@ -821,6 +829,22 @@ TEMPLATE = r'''<!DOCTYPE html>
   .chip[data-on="0"] .dot{filter:grayscale(1)}
   .chip[data-empty="1"]{border-style:dashed}
   .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* chipy dziedzin podatkowych + tagi na kartach */
+  .domrow{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}
+  .domlab{font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;flex:none}
+  .dchips{display:flex;gap:6px;flex-wrap:wrap}
+  .dchip{border:1px solid var(--dc);background:transparent;color:var(--dc);padding:3px 10px;border-radius:999px;
+    font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;user-select:none}
+  .dchip:hover{background:rgba(0,0,0,.04)}
+  .dchip.on{background:var(--dc);color:#fff}
+  .cardtags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .dtag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:1px 7px;
+    border-radius:999px;color:#fff;line-height:1.5}
+  /* data wejścia w życie (vacatio legis) */
+  .inforce{font-size:12.5px;margin:7px 0 2px;padding:5px 10px;border-radius:8px;font-weight:600;line-height:1.4}
+  .inforce-soon{background:rgba(176,124,42,.12);border:1px solid rgba(176,124,42,.32);color:#8a5a2e}
+  .inforce-soon .ifd{font-weight:700;white-space:nowrap}
+  .inforce-past{background:transparent;color:var(--ink-faint);font-weight:500;padding:2px 0}
 
   .summary-panel{margin-top:16px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);
     padding:18px 20px;box-shadow:0 1px 2px rgba(22,35,59,.04)}
@@ -940,6 +964,30 @@ TEMPLATE = r'''<!DOCTYPE html>
   .ttitle{font-size:14px;font-weight:600;color:var(--ink);line-height:1.34}
   .tmeta{font-size:11.5px;color:var(--ink-soft);margin-top:6px}
   .tnote{font-size:11.5px;color:var(--ink-faint);margin-top:4px;line-height:1.35}
+  /* nowe od ostatniej wizyty */
+  .newbar{background:rgba(138,46,42,.07);border:1px solid rgba(138,46,42,.18);color:var(--accent);
+    border-radius:9px;padding:9px 13px;font-size:13px;font-weight:600;margin-bottom:14px}
+  .newbar .nbwhen{color:var(--ink-faint);font-weight:500}
+  .card.is-new{box-shadow:inset 3px 0 0 var(--accent), 0 1px 2px rgba(22,35,59,.04)}
+  .new-pill{display:inline-block;margin-left:6px;background:var(--accent);color:#f3e9df;font-size:9.5px;
+    font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:999px;vertical-align:middle}
+  /* wskaźniki: kursy NBP + ściągawka */
+  .nbp-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:12px}
+  .rategrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+  .rate{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 11px;
+    display:flex;flex-direction:column;gap:1px}
+  .rate.rmain{border-color:rgba(29,58,107,.35);background:rgba(29,58,107,.04)}
+  .rate .rc{font-weight:700;font-size:13px;color:var(--ink)}
+  .rate .rm{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--accent)}
+  .rate .rn{font-size:10.5px;color:var(--ink-faint)}
+  .sci-head{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin:24px 2px 12px}
+  .scigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:11px}
+  .sci{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);
+    border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:2px}
+  .sci .sl{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .sci .sv{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink)}
+  .sci .sn{font-size:11.5px;color:var(--ink-faint);line-height:1.35}
   /* rozwijana karta etapów rządowych (RCL) */
   .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
@@ -1028,8 +1076,9 @@ TEMPLATE = r'''<!DOCTYPE html>
 
   <div class="wrap">
     <nav class="tabs">
-      <button class="tab on" data-tab="news">Wiadomości</button>
+      <button class="tab on" data-tab="news">Wiadomości<span class="tabbadge" id="newsBadge"></span></button>
       <button class="tab" data-tab="terminy">Terminy</button>
+      <button class="tab" data-tab="wskazniki">Wskaźniki</button>
       <button class="tab" data-tab="legis">Ustawy</button>
       <button class="tab" data-tab="rcl">RCL</button>
       <button class="tab" data-tab="wyroki">Wyroki</button>
@@ -1041,6 +1090,7 @@ TEMPLATE = r'''<!DOCTYPE html>
       <div class="controls">
         <input class="search" id="search" type="text" placeholder="Szukaj: VAT, KSeF, estoński CIT, ZUS, orzeczenie…" autocomplete="off">
         <div class="chips" id="chips"></div>
+        <div class="domrow"><span class="domlab">Dziedzina</span><div class="dchips" id="domChips"></div></div>
       </div>
 
       {SUMMARY}
@@ -1057,6 +1107,7 @@ TEMPLATE = r'''<!DOCTYPE html>
         <p class="livehint">Pisanie filtruje na bieżąco to, co już pobrane. <b>„Szukaj na żywo"</b> (albo Enter) odpytuje Dziennik Ustaw i Monitor Polski w czasie rzeczywistym.</p>
       </div>
       <div id="liveResults"></div>
+      <section id="legisSoon"></section>
       <section id="legis"></section>
     </section>
 
@@ -1111,6 +1162,13 @@ TEMPLATE = r'''<!DOCTYPE html>
       <div id="terminyList"></div>
     </section>
 
+    <section id="wskazView" hidden>
+      <div class="controls">
+        <div id="nbpBox"></div>
+        <div id="sciagawkaBox"></div>
+      </div>
+    </section>
+
     <footer>
       <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — w jednym miejscu.<br>
       <b>Wiadomości</b> — artykuły z portali (chipem włączasz/wyłączasz źródło). <b>Ustawy</b> — projekty w Sejmie i ustawy ogłoszone w Dz.U. <b>RCL</b> — projekty na etapie rządowym, z rozwijanymi etapami. <b>Moje</b> — pozycje dodane plusikiem. Wybory zapamiętuje przeglądarka.
@@ -1121,11 +1179,41 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set() };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set(), nbpData:null, nbpLoading:false, dom:new Set() };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
 try{ const s=localStorage.getItem("paragraf-termoff"); if(s) state.termOff=new Set(JSON.parse(s)); }catch(e){}
+// "Nowe od ostatniej wizyty": zapamietujemy znacznik poprzedniej wizyty (do podswietlania),
+// a nowy zapisujemy tylko gdy minelo >20 min - dzieki temu szybkie F5 nie kasuje podswietlen.
+let LAST_VISIT=0;
+try{ LAST_VISIT=+localStorage.getItem("paragraf-lastvisit")||0; }catch(_){}
+try{ const _n=Date.now(); if(!LAST_VISIT || _n-LAST_VISIT>1200000) localStorage.setItem("paragraf-lastvisit", String(_n)); }catch(_){}
+function isNew(it){ return LAST_VISIT>0 && it._d && it._d.getTime()>LAST_VISIT; }
+try{ const s=localStorage.getItem("paragraf-dom"); if(s) state.dom=new Set(JSON.parse(s)); }catch(_){}
+// Kategoryzacja po dziedzinie podatkowej (regexy: krotkie kody \b...\b, frazy - fragmentem).
+const TAX_DOMS=[
+  {key:"VAT",  label:"VAT",            color:"#1d3a6b", re:/\bvat\b|towarów i usług|ksef|faktur|jpk[_ ]?v7|split payment|biała lista|wewnątrzwspólnotow|odwrotne obciąż/i},
+  {key:"PIT",  label:"PIT",            color:"#8a2e2a", re:/\bpit\b|pit-\d|osób fizycznych|rycza[łl]t|skal[ai] podatkow|podatek liniowy|kwota wolna|najem prywatn|nierejestrow/i},
+  {key:"CIT",  label:"CIT",            color:"#6b4a8a", re:/\bcit\b|cit-\d|osób prawnych|estoński|podatek minimaln|minimalny podatek|podatek od spółek/i},
+  {key:"ZUS",  label:"ZUS / składki",  color:"#0f5c4a", re:/\bzus\b|sk[łl]adk|ubezpiecze\w* spo[łl]|zdrowotn|emerytur|rentow|chorobow|wypadkow/i},
+  {key:"AKC",  label:"Akcyza",         color:"#8a5a2e", re:/akcyz|banderol|susz tytoniow|alkohol etylow/i},
+  {key:"LOK",  label:"Lokalne",        color:"#4a7a3a", re:/od nieruchomości|podatek rolny|podatek leśny|środków transportow|\bpcc\b|czynności cywilnoprawnych|spadków i darowizn|od spadków|darowizn/i},
+  {key:"PROC", label:"Procedura",      color:"#7a6a2a", re:/ordynacj|postępowani\w* podatkow|kontrol\w* (podatkow|skarbow)|administracj\w* skarbow|czynny żal|przedawnieni|schemat\w* podatkow|\bmdr\b/i},
+  {key:"RACH", label:"Rachunkowość",   color:"#5a5a6a", re:/rachunkow|sprawozdani\w* finansow|księgi rachunk|jpk[_ ]?(cit|pit)|biegł\w* rewiden|e-sprawozdani/i},
+  {key:"MDZ",  label:"Międzynar.",     color:"#2a6a7a", re:/cen\w* transferow|u źródła|withholding|\bwht\b|raj podatkow|umowa o unikaniu|\boecd\b|transgraniczn/i}
+];
+function taxTags(text){ const t=(text||"").toLowerCase(); return TAX_DOMS.filter(d=>d.re.test(t)); }
+function tagsHTML(tags, max){ if(!tags||!tags.length) return ""; return `<div class="cardtags">${tags.slice(0,max||2).map(d=>`<span class="dtag" style="background:${d.color}">${esc(d.label)}</span>`).join("")}</div>`; }
+function renderDomChips(){
+  const box=$("#domChips"); if(!box) return;
+  box.innerHTML=TAX_DOMS.map(d=>`<button class="dchip${state.dom.has(d.key)?' on':''}" data-dom="${d.key}" style="--dc:${d.color}">${esc(d.label)}</button>`).join("");
+  box.querySelectorAll("[data-dom]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.dom; state.dom.has(k)?state.dom.delete(k):state.dom.add(k);
+    try{localStorage.setItem("paragraf-dom",JSON.stringify([...state.dom]))}catch(_){}
+    renderDomChips(); render();
+  });
+}
 const presentIds = new Set(DATA.map(d=>d.fid));
 
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -1180,11 +1268,13 @@ function ago(d){
 
 function newsVisible(){
   const q=state.q.trim().toLowerCase();
-  return DATA
+  let arr=DATA
     .filter(it=>!it.track)
     .filter(it=>!state.off.has(it.fid))
     .filter(it=>!q||(it.title+" "+it.desc+" "+it.src+" "+it.cat).toLowerCase().includes(q))
-    .map(it=>({...it,_d:pd(it.date)}));
+    .map(it=>({...it,_d:pd(it.date),_tags:taxTags(it.title+" "+it.desc)}));
+  if(state.dom.size) arr=arr.filter(it=>it._tags.some(d=>state.dom.has(d.key)));
+  return arr;
 }
 function ustawyVisible(){
   const q=state.qL.trim().toLowerCase();
@@ -1284,6 +1374,18 @@ function rclStages(text){
   items.forEach((it,i)=>{ it.state = i<cur?"done":(i===cur?"cur":"pending"); });
   return items;
 }
+function inforceHTML(it){
+  if(!it.inforce) return "";
+  const d=new Date(it.inforce); if(isNaN(d.getTime())) return "";
+  const y=d.getFullYear(); if(y<2000||y>2100) return "";
+  const today=new Date(); today.setHours(0,0,0,0);
+  const x=new Date(d); x.setHours(0,0,0,0);
+  const days=Math.round((x-today)/86400000);
+  const ds=PL.format(d);
+  if(days>0) return `<div class="inforce inforce-soon">⏱ Wchodzi w życie: <b>${esc(ds)}</b> <span class="ifd">za ${days} ${days===1?'dzień':'dni'}</span></div>`;
+  if(days===0) return `<div class="inforce inforce-soon">⏱ Wchodzi w życie: <b>dziś (${esc(ds)})</b></div>`;
+  return `<div class="inforce inforce-past">Obowiązuje od ${esc(ds)}</div>`;
+}
 function legisCard(it){
   const when = ago(it._d) || "—";
   const stageLine = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
@@ -1319,6 +1421,8 @@ function legisCard(it){
   return `<article class="lcard ${it.left?'is-left':''} ${it.closed?'is-closed':''} ${(it.became||it.continued)?'is-done':''}" style="--ccol:${it.color}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(it.src)}</span><span class="lright"><span class="lwhen">${esc(when)}</span>${addbtn(mini)}</span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+    ${tagsHTML(taxTags(it.title),2)}
+    ${inforceHTML(it)}
     ${body}
   </article>`;
 }
@@ -1374,7 +1478,7 @@ async function searchDU(){
           if(!a||!a.title) continue;
           out.push({type:"ustawa", title:a.title, link:a.ELI?`https://api.sejm.gov.pl/eli/acts/${a.ELI}/text.pdf`:"#",
             src:pub==="DU"?"Dziennik Ustaw":"Monitor Polski", color:pub==="DU"?"#1d3a6b":"#0f5c4a",
-            stage:"Opublikowano", step:4, _d:pd(a.announcementDate||null)});
+            stage:"Opublikowano", step:4, inforce:a.entryIntoForce||null, _d:pd(a.announcementDate||null)});
         }
       }
     }
@@ -1464,6 +1568,7 @@ function wyrokCard(it){
   return `<article class="lcard" style="--ccol:#3a5c8a">
     <div class="lhead"><span class="lsrc"><span class="dot"></span>${esc(kind)}${date?" · "+esc(date):""}</span><span class="lright">${addbtn(mini)}</span></div>
     <a class="ltitle" href="${esc(link)}" target="_blank" rel="noopener">${esc(title)}</a>
+    ${tagsHTML(taxTags(title+" "+(snip||"")),2)}
     ${snip?`<p class="wyrok-snip">${esc(snip)}</p>`:""}
   </article>`;
 }
@@ -1516,20 +1621,33 @@ function renderNews(){
   const vis=newsVisible(); const feed=$("#feed");
   if(!vis.length){
     feed.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Brak wiadomości</h3><p>Zmień frazę albo włącz więcej źródeł powyżej.</p></div>`;
+    updateNewsBadge(0);
     return 0;
   }
+  let newCount=0;
   let h="",last=null;
   for(const it of vis){
+    const fresh=isNew(it); if(fresh) newCount++;
     const k=dayKey(it._d);
     if(k!==last){h+=`<div class="daysep"><span class="lab">${esc(dayLabel(it._d))}</span><span class="rule"></span></div>`;last=k;}
-    h+=`<article class="card" style="--ccol:${it.color}">
-      <div class="chead"><span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span></span>${addbtn({type:"news", title:it.title, link:it.link, src:it.src, stage:"", step:0})}</div>
+    h+=`<article class="card${fresh?' is-new':''}" style="--ccol:${it.color}">
+      <div class="chead"><span class="src"><span class="dot"></span>${esc(it.src)} <span class="cat">${esc(it.cat)}</span>${fresh?'<span class="new-pill">NOWE</span>':''}</span>${addbtn({type:"news", title:it.title, link:it.link, src:it.src, stage:"", step:0})}</div>
       <a class="title" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+      ${tagsHTML(it._tags,2)}
       ${ (it.summary||it.desc) ? `<p class="desc${it.summary?' sum':''}">${it.summary?'<span class="aitag">✦ streszczenie</span> ':''}${esc(it.summary||it.desc)}</p>` : "" }
       <div class="meta">${esc(ago(it._d))||"—"}</div>
     </article>`;
   }
-  feed.innerHTML=h; return vis.length;
+  let bar="";
+  if(newCount>0){
+    const when=new Date(LAST_VISIT).toLocaleString("pl-PL",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"});
+    bar=`<div class="newbar">✦ Nowe od ostatniej wizyty: <b>${newCount}</b> <span class="nbwhen">(byłeś tu: ${esc(when)})</span></div>`;
+  }
+  feed.innerHTML=bar+h; updateNewsBadge(newCount); return vis.length;
+}
+function updateNewsBadge(n){
+  const b=$("#newsBadge"); if(!b) return;
+  b.textContent=n>0?n:""; b.classList.toggle("show", n>0);
 }
 
 function renderTracker(items, L, searching, headOn, countWord){
@@ -1550,7 +1668,28 @@ function renderTracker(items, L, searching, headOn, countWord){
   if(sa) sa.onclick=()=>{ L.querySelector(".lgrid").innerHTML=items.map(legisCard).join(""); sa.remove(); };
   return items.length;
 }
-function renderUstawy(){ return renderTracker(ustawyVisible(), $("#legis"), state.qL.trim().length>0, "Sejm i Dziennik Ustaw", "śledzonych"); }
+function renderUstawy(){
+  const all=ustawyVisible();
+  const searching=state.qL.trim().length>0;
+  const soonBox=$("#legisSoon");
+  if(searching){
+    if(soonBox) soonBox.innerHTML="";
+    return renderTracker(all, $("#legis"), true, "Sejm i Dziennik Ustaw", "śledzonych");
+  }
+  const now=Date.now();
+  const fdate=it=>{ if(!it.inforce) return null; const d=new Date(it.inforce); return isNaN(d.getTime())?null:d; };
+  const isFuture=it=>{ const d=fdate(it); return d && d.getTime()>now; };
+  const soon=all.filter(isFuture).sort((a,b)=>fdate(a)-fdate(b));
+  const rest=all.filter(it=>!isFuture(it));
+  if(soonBox){
+    soonBox.innerHTML = soon.length
+      ? `<div class="lsec-head"><span class="lt">⏱ Wchodzą w życie wkrótce</span><span class="lcount">${soon.length}</span></div>`
+        +`<p class="livehint" style="margin:-4px 0 10px">Akty opublikowane, które dopiero zaczną obowiązywać. Śledzę datę wejścia w życie najnowszych aktów z Dz.U./M.P.</p>`
+        +`<div class="lgrid">${soon.map(legisCard).join("")}</div>`
+      : "";
+  }
+  return renderTracker(rest, $("#legis"), false, "Sejm i Dziennik Ustaw", "śledzonych") + soon.length;
+}
 function renderRcl(){ return renderTracker(rclVisible(), $("#rclList"), state.qR.trim().length>0, "Projekty na etapie rządowym", "projektów"); }
 
 function mojeCard(it){
@@ -1725,6 +1864,50 @@ function renderTerminy(){
   return all.length;
 }
 
+// ===== WSKAŹNIKI: kursy NBP (na żywo) + ściągawka stawek =====
+const NBP_MAIN=["EUR","USD","GBP","CHF"];
+function fmtMid(m){ const s=(typeof m==="number"?m.toFixed(4):String(m)); return s.replace(".",","); }
+function renderNBP(tab){
+  const box=$("#nbpBox"); if(!box) return;
+  const rates=(tab.rates||[]).slice();
+  rates.sort((a,b)=>{ const ia=NBP_MAIN.indexOf(a.code), ib=NBP_MAIN.indexOf(b.code);
+    if(ia>=0||ib>=0){ if(ia<0)return 1; if(ib<0)return -1; return ia-ib; } return a.code<b.code?-1:1; });
+  const cards=rates.map(r=>`<div class="rate${NBP_MAIN.includes(r.code)?' rmain':''}"><span class="rc">${esc(r.code)}</span><span class="rm">${fmtMid(r.mid)} zł</span><span class="rn">${esc(r.currency)}</span></div>`).join("");
+  box.innerHTML=`<div class="nbp-head"><span>Kursy średnie NBP — tabela ${esc(tab.no||"")} z dnia ${esc(tab.effectiveDate||"")}</span><button class="livebtn" id="nbpRefresh">Odśwież</button></div>
+    <div class="rategrid">${cards}</div>
+    <p class="livehint" style="margin-top:8px">1 jednostka waluty = ile zł (kurs średni, tabela A). Do przeliczeń podatkowych zwykle bierze się kurs średni z <b>ostatniego dnia roboczego poprzedzającego</b> dzień uzyskania przychodu / poniesienia kosztu.</p>`;
+  const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpData=null; state.nbpLoading=false; loadNBP(); };
+}
+async function loadNBP(){
+  const box=$("#nbpBox"); if(!box||state.nbpLoading) return;
+  state.nbpLoading=true; box.innerHTML=`<div class="live-status">Pobieram kursy z NBP…</div>`;
+  const fail=(msg)=>{ state.nbpLoading=false; box.innerHTML=`<div class="live-status">${msg} <button class="livebtn" id="nbpRefresh" style="margin-left:6px">Spróbuj ponownie</button></div>`; const rb=$("#nbpRefresh"); if(rb) rb.onclick=()=>{ state.nbpLoading=false; loadNBP(); }; };
+  try{
+    const data=await getJSON("https://api.nbp.pl/api/exchangerates/tables/A/?format=json");
+    const tab=Array.isArray(data)?data[0]:((data&&data.rates)?data:null);
+    state.nbpLoading=false;
+    if(!tab||!tab.rates){ fail("Nie udało się pobrać kursów NBP (serwis nie odpowiedział)."); return; }
+    state.nbpData=tab; renderNBP(tab);
+  }catch(e){ fail("Błąd pobierania kursów NBP."); }
+}
+function renderWskazniki(){
+  const sb=$("#sciagawkaBox");
+  if(sb && !sb.dataset.done){
+    sb.dataset.done="1";
+    sb.innerHTML=`<div class="sci-head">Ściągawka — stan na 2026</div>
+    <div class="scigrid">
+      <div class="sci"><span class="sl">Zwolnienie podmiotowe VAT</span><span class="sv">240 000 zł / rok</span><span class="sn">od 1.01.2026 (wcześniej 200 000 zł)</span></div>
+      <div class="sci"><span class="sl">Limit ryczałtu</span><span class="sv">2 000 000 EUR</span><span class="sn">przychód za rok poprzedni · kwartalnie do 200 000 EUR</span></div>
+      <div class="sci"><span class="sl">Dieta krajowa</span><span class="sv">45 zł / dobę</span><span class="sn">8–12 h = 50% · powyżej 12 h = 100%</span></div>
+      <div class="sci"><span class="sl">Kilometrówka</span><span class="sv">0,89 / 1,15 zł/km</span><span class="sn">≤900 cm³ / powyżej 900 cm³ · motocykl 0,69 · motorower 0,42</span></div>
+      <div class="sci"><span class="sl">Składki społeczne (% podstawy)</span><span class="sv">em. 19,52% · rent. 8% · chor. 2,45%</span><span class="sn">wypadkowa ok. 1,67% (typowa) · zdrowotna 9%</span></div>
+    </div>
+    <p class="livehint" style="margin-top:8px">⚠ Wartości zmieniają się co roku (zwłaszcza kwoty ZUS i progi) — przed użyciem sprawdź aktualność u źródła. To skrót poglądowy, nie porada podatkowa.</p>`;
+  }
+  if(state.nbpData) renderNBP(state.nbpData); else loadNBP();
+  return state.nbpData?state.nbpData.rates.length:0;
+}
+
 function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
@@ -1733,6 +1916,7 @@ function render(){
   else if(state.tab==="rcl") c=r;
   else if(state.tab==="moje") c=mj;
   else if(state.tab==="terminy") c=renderTerminy();
+  else if(state.tab==="wskazniki") c=renderWskazniki();
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
   else c=n;
@@ -1750,6 +1934,7 @@ function switchTab(t){
   $("#kisView").hidden   = t!=="kis";
   $("#mojeView").hidden  = t!=="moje";
   $("#terminyView").hidden = t!=="terminy";
+  $("#wskazView").hidden = t!=="wskazniki";
   render();
 }
 
@@ -1782,7 +1967,7 @@ function switchTab(t){
     const rm=e.target.closest("[data-rm]");
     if(rm){ state.moje=state.moje.filter(x=>x.link!==rm.dataset.rm); saveMoje(); render(); }
   });
-  renderChips(); render();
+  renderChips(); renderDomChips(); render();
 })();
 </script>
 </body>

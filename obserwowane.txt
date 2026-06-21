@@ -1,11 +1,18 @@
-# Moje obserwowane projekty — jeden wpis na linię.
+# Moje obserwowane projekty i tematy — jeden wpis na linię.
 #
 # Możesz wpisać:
 #   • numer z wykazu RCL, np.:        UD116
 #   • albo pełny link do projektu, np.:  https://legislacja.rcl.gov.pl/projekt/12402157
+#   • albo TEMAT/dziedzinę, np.:        temat: VAT
+#                                       temat: KSeF
+#                                       temat: estoński CIT
+#     (dostaniesz maila, gdy w Dzienniku Ustaw / Monitorze Polskim
+#      pojawi się NOWY akt z tą frazą w tytule)
 #
 # Linie zaczynające się od # są pomijane (to komentarze).
 # Po każdej zmianie tego pliku robot przy najbliższym sprawdzeniu (co 24h)
 # uwzględni nową listę. Możesz też uruchomić sprawdzenie ręcznie w zakładce Actions.
 
 UD116
+temat: VAT
+
