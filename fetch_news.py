@@ -1097,6 +1097,21 @@ TEMPLATE = r'''<!DOCTYPE html>
   .vat-rnone{font-size:12.5px;color:var(--ink-faint);font-style:italic}
   .vat-cnote{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:12px;
     padding:9px 11px;background:rgba(176,124,42,.08);border-left:3px solid var(--accent);border-radius:0 7px 7px 0}
+  /* schemat transgraniczny VAT (sprzedaz z PL za granice) */
+  .vat-xb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+  .vat-xb-lbl{flex:none;min-width:90px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);font-weight:700}
+  .vat-xb-row .srcToggle{flex:1;margin-bottom:0;min-width:200px}
+  .vat-xb-row .srcbtn{min-width:0;flex:1 1 auto;padding:7px 10px;font-size:12.5px}
+  .vat-xb-res{margin-top:14px;padding:14px 15px;background:var(--paper,#faf7f1);border:1px solid var(--line);border-radius:10px}
+  .vat-xb-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:9px}
+  .vat-xb-head .vat-badge{min-width:0;font-size:12px;font-family:var(--sans);font-weight:700;padding:5px 11px;border-radius:7px}
+  .vat-xb-title{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--ink)}
+  .vat-xb-rate{font-size:14px;color:var(--ink-soft);margin-bottom:8px}
+  .vat-xb-rate b{color:var(--accent)}
+  .vat-xb-desc{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin-bottom:9px}
+  .vat-xb-warunki{margin:0 0 9px;padding-left:18px;font-size:12px;color:var(--ink-soft);line-height:1.5}
+  .vat-xb-warunki li{margin-bottom:4px}
+  .vat-xb-podst{font-size:11px;color:var(--ink-faint);font-style:italic;padding-top:9px;border-top:1px dashed var(--line)}
   /* kalkulator */
   .kalk-inputs{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
   .kin{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
@@ -2561,6 +2576,65 @@ function vatVerify(q){
   }
   return {rate:"23%", cat:"stawka podstawowa", note:"Większość towarów i usług. Jeśli to żywność, książki albo usługa społeczna/medyczna — sprawdź dokładniej; 23% to wartość domyślna."};
 }
+// --- Schemat VAT transgraniczny: sprzedaz z Polski (towar/usluga x firma/konsument x UE/poza UE) ---
+const VAT_XB = {
+  towar: {
+    b2b: {
+      ue: {tag:"WDT · 0%", col:"#2a6a7a", title:"Wewnątrzwspólnotowa dostawa towarów (WDT)", rate:"0% VAT",
+        desc:"Sprzedaż towaru firmie z innego kraju UE. Stawka 0%, a prawo do odliczenia VAT od zakupów zachowane.",
+        warunki:["Nabywca ma ważny numer VAT-UE — sprawdź w bazie VIES","Masz dokumenty potwierdzające wywóz towaru do innego kraju UE","Wykazujesz transakcję w informacji podsumowującej VAT-UE"],
+        podstawa:"art. 13 i 42 ustawy o VAT"},
+      poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towarów", rate:"0% VAT",
+        desc:"Wywóz towaru poza UE (np. do Wielkiej Brytanii, USA). Stawka 0% po potwierdzeniu wywozu.",
+        warunki:["Masz dokument potwierdzający wywóz poza UE — komunikat IE-599 albo dokument celny","Bez potwierdzenia w terminie stosujesz stawkę krajową, z korektą po otrzymaniu dokumentu","Nabywca zwykle płaci VAT importowy i cło w swoim kraju"],
+        podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+    },
+    b2c: {
+      ue: {tag:"WSTO · OSS", col:"#b07c2a", title:"Wewnątrzwspólnotowa sprzedaż towarów na odległość (WSTO)", rate:"VAT kraju nabywcy (powyżej progu)",
+        desc:"Sprzedaż towaru konsumentowi w innym kraju UE (e-commerce). Co do zasady VAT kraju konsumenta.",
+        warunki:["Do limitu 10 000 EUR rocznie (łącznie WSTO + usługi elektroniczne) możesz stosować polski VAT","Powyżej limitu — VAT kraju nabywcy, najwygodniej przez procedurę VAT-OSS: jedna deklaracja składana w Polsce"],
+        podstawa:"art. 22a ustawy o VAT, procedura OSS"},
+      poza: {tag:"Eksport · 0%", col:"#2a6a7a", title:"Eksport towarów do konsumenta", rate:"0% VAT",
+        desc:"Wywóz towaru do konsumenta poza UE. Traktowany jak eksport — 0% po potwierdzeniu wywozu.",
+        warunki:["Dokument potwierdzający wywóz poza UE","Konsument może być zobowiązany do zapłaty cła i VAT importowego w swoim kraju"],
+        podstawa:"art. 2 pkt 8 i art. 41 ust. 4-11 ustawy o VAT"},
+    },
+  },
+  usluga: {
+    b2b: {
+      ue: {tag:"Reverse charge", col:"#6b4a8a", title:"Usługa dla firmy z UE — odwrotne obciążenie", rate:"Bez VAT (rozlicza nabywca)",
+        desc:"Miejsce opodatkowania to kraj nabywcy. Wystawiasz fakturę bez polskiego VAT z adnotacją: odwrotne obciążenie (reverse charge).",
+        warunki:["Nabywca to podatnik (firma) — warto potwierdzić jego numer VAT-UE","Faktura bez kwoty VAT, z adnotacją reverse charge / odwrotne obciążenie","Wykazujesz w informacji podsumowującej VAT-UE"],
+        podstawa:"art. 28b ustawy o VAT"},
+      poza: {tag:"Poza PL VAT", col:"#6b4a8a", title:"Usługa dla firmy spoza UE", rate:"Bez VAT (poza zakresem PL)",
+        desc:"Miejsce opodatkowania to kraj nabywcy (państwo trzecie). Faktura bez polskiego VAT.",
+        warunki:["Faktura bez VAT z adnotacją, że podatek rozlicza nabywca","Nie wykazujesz w VAT-UE — to nie jest transakcja unijna","Nabywca rozlicza podatek wg przepisów swojego kraju"],
+        podstawa:"art. 28b ustawy o VAT"},
+    },
+    b2c: {
+      ue: {tag:"VAT PL (zasada)", col:"#8a2e2a", title:"Usługa dla konsumenta z UE", rate:"Co do zasady VAT polski",
+        desc:"Zasada ogólna: miejsce opodatkowania to siedziba usługodawcy, czyli Polska — stosujesz polską stawkę.",
+        warunki:["Wyjątek: usługi elektroniczne, telekomunikacyjne i nadawcze (TBE) — VAT kraju konsumenta powyżej progu 10 000 EUR, przez OSS","Wyjątek: usługi związane z nieruchomością — VAT kraju nieruchomości","Inne wyjątki: transport, wstęp na imprezy, gastronomia"],
+        podstawa:"art. 28c ustawy o VAT (wyjątki: art. 28e-28n)"},
+      poza: {tag:"Zależy od usługi", col:"#8a2e2a", title:"Usługa dla konsumenta spoza UE", rate:"Zasada: VAT polski; częste wyjątki",
+        desc:"Zasada ogólna to polski VAT (siedziba usługodawcy), ale dla wielu usług niematerialnych opodatkowanie jest w kraju konsumenta.",
+        warunki:["Wyjątek: usługi niematerialne (doradcze, prawne, reklamowe, licencje, IT) dla konsumenta spoza UE — opodatkowane w kraju konsumenta, bez polskiego VAT","Wyjątek: usługi elektroniczne dla konsumenta spoza UE — poza polskim VAT","Usługi związane z nieruchomością — VAT kraju nieruchomości"],
+        podstawa:"art. 28c oraz art. 28l ustawy o VAT"},
+    },
+  },
+};
+let xbT="towar", xbC="b2b", xbW="ue";
+function vatXbRender(){
+  const out=$("#vatXbResult"); if(!out) return;
+  const d=VAT_XB[xbT][xbC][xbW]; if(!d) return;
+  out.innerHTML=`<div class="vat-xb-res">
+    <div class="vat-xb-head"><span class="vat-badge" style="background:${d.col}">${esc(d.tag)}</span><span class="vat-xb-title">${esc(d.title)}</span></div>
+    <div class="vat-xb-rate">Twój VAT: <b>${esc(d.rate)}</b></div>
+    <div class="vat-xb-desc">${esc(d.desc)}</div>
+    <ul class="vat-xb-warunki">${d.warunki.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>
+    <div class="vat-xb-podst">Podstawa: ${esc(d.podstawa)}</div>
+  </div>`;
+}
 function renderVAT(){
   const box=$("#vatBox"); if(!box || box.dataset.done) return;
   box.dataset.done="1";
@@ -2578,6 +2652,15 @@ function renderVAT(){
       <p class="vat-sub">Cały świat — ponad 130 państw pogrupowanych regionami. Stawka standardowa i obniżone. Stan: styczeń 2026 (orientacyjnie).</p>
       <select id="vatCountry" class="vat-input"></select>
       <div id="vatCountryResult"></div>
+    </div>
+    <div class="vat-tool">
+      <div class="vat-th">Sprzedaż z Polski za granicę — jaki VAT?</div>
+      <p class="vat-sub">Schemat transakcji transgranicznych: co sprzedajesz, komu i dokąd. Rozróżnia transakcje wewnątrz UE i z państwami trzecimi (np. UK, USA).</p>
+      <div class="vat-xb-row"><span class="vat-xb-lbl">Co sprzedajesz</span><div id="xbT" class="srcToggle"><button class="srcbtn on" data-xbt="towar">Towar</button><button class="srcbtn" data-xbt="usluga">Usługa</button></div></div>
+      <div class="vat-xb-row"><span class="vat-xb-lbl">Komu</span><div id="xbC" class="srcToggle"><button class="srcbtn on" data-xbc="b2b">Firma (podatnik)</button><button class="srcbtn" data-xbc="b2c">Konsument</button></div></div>
+      <div class="vat-xb-row"><span class="vat-xb-lbl">Dokąd</span><div id="xbW" class="srcToggle"><button class="srcbtn on" data-xbw="ue">Kraj UE</button><button class="srcbtn" data-xbw="poza">Poza UE</button></div></div>
+      <div id="vatXbResult"></div>
+      <p class="vat-caveat">To uproszczony schemat zasad ogólnych. Są wyjątki (m.in. usługi związane z nieruchomościami, elektroniczne, transport, montaż na miejscu). W razie wątpliwości — WIS albo doradca podatkowy.</p>
     </div>`;
   const ex=["książka","nocleg w hotelu","usługi księgowe","chleb","kawa","fryzjer","leki","eksport"];
   $("#vatExamples").innerHTML=ex.map(e=>`<button class="vat-chip" data-vex="${esc(e)}">${esc(e)}</button>`).join("");
@@ -2592,6 +2675,12 @@ function renderVAT(){
   sel.value=pl>=0?pl:0;
   sel.addEventListener("change", vatShowCountry);
   vatShowCountry();
+  const xbWire=(id,attr,set)=>{ document.querySelectorAll(`#${id} .srcbtn`).forEach(b=>b.onclick=()=>{
+    set(b.dataset[attr]); document.querySelectorAll(`#${id} .srcbtn`).forEach(x=>x.classList.toggle("on",x===b)); vatXbRender(); }); };
+  xbWire("xbT","xbt",v=>xbT=v);
+  xbWire("xbC","xbc",v=>xbC=v);
+  xbWire("xbW","xbw",v=>xbW=v);
+  vatXbRender();
 }
 function vatShowResult(){
   const out=$("#vatResult"); if(!out) return;
