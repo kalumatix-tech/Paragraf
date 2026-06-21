@@ -1050,6 +1050,15 @@ TEMPLATE = r'''<!DOCTYPE html>
     font-family:var(--serif);background:var(--surface);color:var(--ink);min-width:150px}
   .kc-dochod{font-size:13px;color:var(--ink-soft);margin-bottom:12px}
   .kc-dochod b{font-family:var(--serif);font-size:15px;color:var(--ink)}
+  .kin-chk{flex-direction:row;align-items:center;gap:7px;align-self:flex-end;padding-bottom:9px}
+  .kin-chk input{min-width:0;width:16px;height:16px;accent-color:var(--accent)}
+  .kin-chk span{font-weight:600}
+  .kc-zus{font-size:13px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);
+    border-left:3px solid var(--accent);border-radius:9px;padding:9px 13px;margin-bottom:10px}
+  .kc-zus b{font-family:var(--serif);color:var(--ink)}
+  .kc-zn{display:block;font-size:11.5px;color:var(--ink-faint);font-weight:400;margin-top:3px}
+  .kc-note{font-size:12px;color:#8a5a2e;background:rgba(176,124,42,.1);border:1px solid rgba(176,124,42,.35);
+    border-radius:8px;padding:7px 11px;margin-bottom:10px}
   .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
   .kc{position:relative;border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:var(--surface)}
   .kc-best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -1266,7 +1275,13 @@ TEMPLATE = r'''<!DOCTYPE html>
         <div class="kalk-inputs">
           <label class="kin"><span>Przychód netto / rok</span><input id="kalkP" type="number" inputmode="decimal" value="300000" min="0" step="any"></label>
           <label class="kin"><span>Koszty / rok</span><input id="kalkK" type="number" inputmode="decimal" value="100000" min="0" step="any"></label>
-          <label class="kin"><span>ZUS społeczny / rok</span><input id="kalkZ" type="number" inputmode="decimal" value="21459.48" min="0" step="any"></label>
+          <label class="kin"><span>Schemat ZUS</span><select id="kalkZus">
+            <option value="pelny" selected>Pełny ZUS (duży)</option>
+            <option value="pref">Preferencyjny (mały, 24 mies.)</option>
+            <option value="plus">Mały ZUS Plus</option>
+            <option value="ulga">Ulga na start (6 mies.)</option>
+          </select></label>
+          <label class="kin kin-chk"><input id="kalkChor" type="checkbox"><span>Ubezpieczenie chorobowe (dobrowolne)</span></label>
           <label class="kin"><span>Stawka ryczałtu</span><select id="kalkR">
             <option value="0.17">17%</option>
             <option value="0.15">15%</option>
@@ -1281,7 +1296,7 @@ TEMPLATE = r'''<!DOCTYPE html>
           </select></label>
         </div>
         <div id="kalkResults"></div>
-        <p class="livehint" style="margin-top:10px">Założenia: standardowy ZUS 2026 (możesz nadpisać), składki należne, dochód = przychód − koszty. Orientacyjnie, dla jednoosobowej działalności — nie jest to porada podatkowa.</p>
+        <p class="livehint" style="margin-top:10px">Składki <b>społeczne</b> liczone automatycznie z wybranego schematu ZUS (stawki 2026), składka <b>zdrowotna</b> liczona sama wg formy (skala 9% / liniowy 4,9% / ryczałt wg progu przychodu). Chorobowe dobrowolne — domyślnie wyłączone. Orientacyjnie, dla jednoosobowej działalności — nie jest to porada podatkowa.</p>
       </div>
     </section>
 
@@ -2262,21 +2277,59 @@ function calcForms(P,K,ZUS,r){
   const F=(pit,zdrow,danina,suma)=>({pit,zdrow,zus:ZUS,danina,suma,netto:D-suma,stopa:D?suma/D:null});
   return { D, lin:F(pitLin,zdrowLin,danLin,sumaLin), rycz:ryczOK?F(pitR,zdrowR,0,sumaR):null, sk:F(pitS,zdrowS,danS,sumaS) };
 }
+// --- schematy ZUS 2026 (skladki spoleczne liczone automatycznie) ---
+const ZUS_BASE_FULL=5652, ZUS_BASE_PREF=1441.80, MIN_WAGE_26=4806, MZP_LIMIT=120000;
+function zusFromBase(base, chor){
+  const r2=x=>Math.round(x*100)/100;
+  let m = r2(base*0.1952) + r2(base*0.08) + r2(base*0.0167);  // emerytalna + rentowa + wypadkowa
+  if(base>=MIN_WAGE_26-0.005) m += r2(base*0.0245);            // Fundusz Pracy gdy podstawa >= min. wynagrodzenia
+  if(chor) m += r2(base*0.0245);                               // chorobowe (dobrowolne)
+  return r2(m)*12;
+}
+function zusForScheme(scheme, P, K, chor){
+  if(scheme==="ulga") return 0;
+  if(scheme==="pref") return zusFromBase(ZUS_BASE_PREF, chor);
+  if(scheme==="plus"){
+    const D=Math.max(P-K,0);
+    const base=Math.min(Math.max((D/365)*30*0.5, ZUS_BASE_PREF), ZUS_BASE_FULL);
+    return zusFromBase(base, chor);
+  }
+  return zusFromBase(ZUS_BASE_FULL, chor);      // pelny
+}
+const ZUS_LABEL={pelny:"Pełny ZUS", pref:"Preferencyjny", plus:"Mały ZUS Plus", ulga:"Ulga na start"};
+const ZUS_NOTE={
+  pelny:"Podstawa 5 652 zł (60% przeciętnego), z Funduszem Pracy.",
+  pref:"Podstawa 1 441,80 zł (30% min. wynagrodzenia), przez pierwsze 24 mies., bez Funduszu Pracy.",
+  plus:"Szacunkowo — podstawa zależy od dochodu z poprzedniego roku, w przedziale 1 441,80–5 652 zł.",
+  ulga:"Pierwsze 6 mies. bez składek społecznych — tu liczone jako brak składek dla całego roku.",
+};
 function renderKalk(){
   const box=$("#kalkResults"); if(!box) return 0;
   if(!box.dataset.wired){
     box.dataset.wired="1";
-    ["#kalkP","#kalkK","#kalkZ"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",renderKalk); });
-    const rs=$("#kalkR"); if(rs) rs.addEventListener("change",renderKalk);
+    ["#kalkP","#kalkK"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",renderKalk); });
+    ["#kalkR","#kalkZus","#kalkChor"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",renderKalk); });
   }
+  const P=kalkNum("#kalkP"), K=kalkNum("#kalkK");
   const r=parseFloat(($("#kalkR")||{}).value||"0.085");
-  const res=calcForms(kalkNum("#kalkP"),kalkNum("#kalkK"),kalkNum("#kalkZ"),r);
+  const chor=!!(($("#kalkChor")||{}).checked);
+  // blokada Malego ZUS Plus po przekroczeniu limitu przychodu
+  const plusLocked = P>MZP_LIMIT;
+  const sel=$("#kalkZus");
+  if(sel){
+    const opt=sel.querySelector('option[value="plus"]');
+    if(opt){ opt.disabled=plusLocked; opt.textContent = plusLocked?"Mały ZUS Plus (limit przekroczony)":"Mały ZUS Plus"; }
+    if(plusLocked && sel.value==="plus") sel.value="pelny";
+  }
+  const scheme=(sel&&sel.value)||"pelny";
+  const ZUS=zusForScheme(scheme,P,K,chor);
+  const res=calcForms(P,K,ZUS,r);
   const forms=[["Liniowy 19%",res.lin],["Ryczałt "+plPct(r),res.rycz],["Skala podatkowa",res.sk]];
   let best=null; forms.forEach(([_,f])=>{ if(f && (best===null||f.suma<best)) best=f.suma; });
   const card=(name,f)=>{
     if(!f) return `<div class="kc kc-off"><div class="kc-h">${esc(name)}</div><div class="kc-na">Niedostępny — przychód powyżej limitu 2 mln EUR.</div></div>`;
     const isBest=best!==null && Math.abs(f.suma-best)<0.005;
-    const rows=[["PIT",f.pit],["Składka zdrowotna",f.zdrow],["ZUS",f.zus]];
+    const rows=[["PIT",f.pit],["Składka zdrowotna",f.zdrow],["ZUS społeczny",f.zus]];
     if(f.danina>0) rows.push(["Danina solidarn.",f.danina]);
     const rh=rows.map(x=>`<div class="kr"><span>${x[0]}</span><b>${plPLN(x[1])}</b></div>`).join("");
     return `<div class="kc${isBest?' kc-best':''}">${isBest?'<div class="kc-badge">najkorzystniej</div>':''}
@@ -2287,8 +2340,12 @@ function renderKalk(){
       <div class="kr"><span>Zostaje (mies.)</span><b>${plPLN(f.netto/12)}</b></div>
     </div>`;
   };
-  box.innerHTML=`<div class="kc-dochod">Dochód (przychód − koszty): <b>${plPLN(res.D)}</b></div>`
-    +`<div class="kgrid">${forms.map(f=>card(f[0],f[1])).join("")}</div>`;
+  const lockNote = plusLocked ? `<div class="kc-note">⚠ Mały ZUS Plus niedostępny — przychód przekracza limit ${plPLN(MZP_LIMIT)} z poprzedniego roku.</div>` : "";
+  box.innerHTML =
+      `<div class="kc-zus">ZUS społeczny — <b>${esc(ZUS_LABEL[scheme])}</b>${chor?" + chorobowe":""}: <b>${plPLN(ZUS)}</b> / rok · ${plPLN(ZUS/12)} / mies. <span class="kc-zn">${esc(ZUS_NOTE[scheme])}</span></div>`
+    + lockNote
+    + `<div class="kc-dochod">Dochód (przychód − koszty): <b>${plPLN(res.D)}</b></div>`
+    + `<div class="kgrid">${forms.map(f=>card(f[0],f[1])).join("")}</div>`;
   return 0;
 }
 
