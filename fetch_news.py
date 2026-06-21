@@ -20,6 +20,10 @@ import urllib.parse
 
 import feedparser
 import requests
+try:
+    from bs4 import BeautifulSoup          # do scrapowania stron BEZ RSS
+except Exception:
+    BeautifulSoup = None
 
 # ------------------------------------------------------------------ #
 #  ZRODLA  -  dodawaj / usuwaj tutaj                                  #
@@ -39,14 +43,46 @@ FEEDS = [
      "url": "https://www.infor.pl/prawo/.feed"},
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
+
+    # --- Interpretacje podatkowe KIS / Min. Finansow ---
+    # UWAGA: interpretacje-podatkowe.org zostalo zawieszone ("account suspended"),
+    # wiec kanal nie dziala - wylaczony. Interpretacje obsluguje teraz zakladka
+    # "Interpretacje" (launcher do oficjalnej wyszukiwarki EUREKA).
+    # {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
+    #  "url": "https://interpretacje-podatkowe.org/feed"},
+
+    # --- Serwis specjalistyczny (na próbę - sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
-     {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+
+    # --- NOWA PARTIA (kandydaci): blogi ksiegowo-firmowe + dodatkowy dzial INFOR.   ---
+    #  To NIE sa cale gazety, tylko serwisy ksiegowo-podatkowe dla przedsiebiorcow.  --
+    #  Po wdrozeniu sprawdz w logu Actions: [ok] = dziala, [pusto]/[blad] = do usuniecia.
+    {"id": "poradnikpp", "name": "Poradnik Przedsiębiorcy", "cat": "Firma",   "color": "#2e6e4a",
+     "url": "https://poradnikprzedsiebiorcy.pl/feed"},
+    {"id": "infakt",     "name": "inFakt",                  "cat": "Firma",   "color": "#2e6e8c",
+     "url": "https://www.infakt.pl/blog/feed/"},
+    {"id": "ifirma",     "name": "ifirma",                  "cat": "Firma",   "color": "#8a6a2e",
+     "url": "https://www.ifirma.pl/blog/feed/"},
+    {"id": "infor-mf",   "name": "INFOR Moja firma",        "cat": "Firma",   "color": "#5c6b2e",
+     "url": "https://mojafirma.infor.pl/.feed"},
+    {"id": "pitpl",      "name": "PIT.pl",                  "cat": "Podatki", "color": "#8a2e5c",
+     "url": "https://www.pit.pl/rss"},
+
+    # ============================================================== #
+    #  CALE GAZETY - WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres - podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -167,6 +203,70 @@ def _hit(haystack_padded: str, term: str) -> bool:
     return term in haystack_padded
 
 
+# ------------------------------------------------------------------ #
+#  SCRAPERY - strony BEZ kanalu RSS. Parsujemy HTML jak Feedly:       #
+#  bierzemy <a> pasujace WZORCEM URL + sensowny tytul. Odporne na     #
+#  zmiany klas CSS (nie zalezymy od konkretnej struktury strony).     #
+#  Blad scrapowania NIE wywala builda (zwraca [] i loguje [blad]).    #
+#  Aby DODAC strone: napisz funkcje scrape_X i dopisz ja do SCRAPERS. #
+# ------------------------------------------------------------------ #
+SCRAPE_ENABLED = True
+SCRAPE_TIMEOUT = 20
+
+def _scrape_links(url, patterns, name, cat, color, fid, min_title=30, limit=40):
+    """Pobiera strone i zwraca pozycje z linkow, ktorych ADRES zawiera
+    ktorykolwiek wzorzec z `patterns`, a TEKST linku ma min. `min_title` znakow
+    (tak oddzielamy artykuly od krotkich linkow nawigacji). Date ustawiamy na
+    dzis - strona glowna pokazuje biezace artykuly, wiec po ~14 dniach rotuja."""
+    if BeautifulSoup is None:
+        print(f"  [błąd]  {name}: brak biblioteki beautifulsoup4")
+        return []
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=SCRAPE_TIMEOUT)
+        r.raise_for_status()
+        r.encoding = r.apparent_encoding or r.encoding
+    except Exception as ex:
+        print(f"  [błąd]  {name}: {ex}")
+        return []
+    soup = BeautifulSoup(r.text, "html.parser")
+    today = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    out, seen = [], set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if href.startswith("//"):
+            href = "https:" + href
+        elif href.startswith("/"):
+            href = urllib.parse.urljoin(url, href)
+        if not any(p in href for p in patterns):
+            continue
+        title = " ".join(a.get_text(" ", strip=True).split())
+        if len(title) < min_title:
+            continue
+        key = _norm(title)[:80]
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "title": title, "link": href, "desc": "", "summary": "",
+            "date": today, "src": name, "cat": cat, "color": color, "fid": fid,
+        })
+        if len(out) >= limit:
+            break
+    print(f"  [ok]    {name}: {len(out)} pozycji (scrape)" if out else f"  [pusto] {name} (scrape)")
+    return out
+
+def scrape_gofin():
+    # Gofin.pl - portal podatkowo-ksiegowy, codzienny, BEZ uzytecznego RSS.
+    return _scrape_links(
+        "https://www.gofin.pl/",
+        patterns=[",artykul,", "sgk.gofin.pl/", "/podatki/", "/rachunkowosc/", "/temat-dnia/"],
+        name="Gofin", cat="Podatki", color="#0f6b4a", fid="gofin",
+    )
+
+# Lista aktywnych scraperow. Dopisz tu kolejne funkcje, gdy zechcesz wiecej stron.
+SCRAPERS = [scrape_gofin] if SCRAPE_ENABLED else []
+
+
 def fetch_all():
     items, live = [], 0
     for f in FEEDS:
@@ -197,6 +297,16 @@ def fetch_all():
             print(f"  [ok]    {f['name']}: {len(entries)} wpisów")
         except Exception as ex:
             print(f"  [błąd]  {f['name']}: {ex}")
+
+    # --- strony BEZ RSS: scrapery (HTML -> pozycje, ten sam filtr FOCUS/BLOCK co RSS) ---
+    for sc in SCRAPERS:
+        try:
+            scraped = sc()
+            if scraped:
+                live += 1
+                items.extend(scraped)
+        except Exception as ex:
+            print(f"  [błąd scrape] {ex}")
 
     items.sort(key=lambda it: it["date"] or "", reverse=True)
     return items, live
@@ -1297,6 +1407,7 @@ TEMPLATE = r'''<!DOCTYPE html>
         <div class="searchrow">
           <input class="search" id="searchW" type="text" placeholder="Szukaj w treści orzeczeń: substancja ekonomiczna, ulga B+R, koszty…  (Enter)" autocomplete="off">
           <button class="livebtn" id="wyrokiBtn" title="Szukaj orzeczen">Szukaj</button>
+          <button class="livebtn" id="wyrokiSaos" title="Skopiuj frazę i otwórz wyszukiwarkę SAOS w nowej karcie">w SAOS ↗</button>
         </div>
         <div class="wyr-filters" id="wyrFilters">
           <label class="wf"><span>Od</span><input id="wyrFrom" type="date"></label>
@@ -1761,11 +1872,13 @@ const _cache = new Map();
 function _race(urls, asText){
   return new Promise(resolve=>{
     let left=urls.length, done=false;
+    const fin=v=>{ if(!done){ done=true; resolve(v); } };
     if(!left){ resolve(null); return; }
+    const tmr=setTimeout(()=>fin(null), 13000);
     urls.forEach(u=>{
       fetch(u).then(r=>{ if(!r.ok) throw 0; return asText?r.text():r.json(); })
-        .then(v=>{ if(done) return; if(asText && (!v||v.length<50)) throw 0; done=true; resolve(v); })
-        .catch(()=>{ if(--left===0 && !done){ done=true; resolve(null); } });
+        .then(v=>{ if(done) return; if(asText && (!v||v.length<50)) throw 0; clearTimeout(tmr); fin(v); })
+        .catch(()=>{ if(--left===0){ clearTimeout(tmr); fin(null); } });
     });
   });
 }
@@ -1786,11 +1899,13 @@ async function getText(u, fresh){
 function _raceValid(urls, validate){
   return new Promise(resolve=>{
     let left=urls.length, done=false;
+    const fin=v=>{ if(!done){ done=true; resolve(v); } };
     if(!left){ resolve(null); return; }
+    const tmr=setTimeout(()=>fin(null), 13000);
     urls.forEach(u=>{
       fetch(u).then(r=>{ if(!r.ok) throw 0; return r.json(); })
-        .then(v=>{ if(done) return; if(!validate(v)) throw 0; done=true; resolve(v); })
-        .catch(()=>{ if(--left===0 && !done){ done=true; resolve(null); } });
+        .then(v=>{ if(done) return; if(!validate(v)) throw 0; clearTimeout(tmr); fin(v); })
+        .catch(()=>{ if(--left===0){ clearTimeout(tmr); fin(null); } });
     });
   });
 }
@@ -3307,6 +3422,7 @@ function switchTab(t){
   $("#searchR").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchRCL(); } });
   $("#wyrokiBtn").onclick=searchWyroki;
   $("#searchW").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchWyroki(); } });
+  { const sb=$("#wyrokiSaos"); if(sb) sb.onclick=()=>{ const q=($("#searchW").value||"").trim(); try{ if(q) navigator.clipboard.writeText(q); }catch(_){}; try{ window.open("https://www.saos.org.pl/search","_blank","noopener"); }catch(_){} }; }
   ["#wyrFrom","#wyrTo","#wyrType","#wyrSort","#wyrPhrase"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("change",()=>{ if(wyrCtx) searchWyroki(); }); });
   $("#kisBtn").onclick=searchKIS;
   $("#searchK").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); searchKIS(); } });
