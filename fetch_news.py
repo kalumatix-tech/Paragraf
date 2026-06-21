@@ -1096,10 +1096,10 @@ TEMPLATE = r'''<!DOCTYPE html>
   .vat-cnote{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:12px;
     padding:9px 11px;background:rgba(176,124,42,.08);border-left:3px solid var(--accent);border-radius:0 7px 7px 0}
   /* schemat transgraniczny VAT (sprzedaz z PL za granice) */
-  .vat-xb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
-  .vat-xb-lbl{flex:none;min-width:92px;white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);font-weight:700}
-  .vat-xb-row .srcToggle{flex:1;margin-bottom:0;min-width:200px}
-  .vat-xb-row .srcbtn{min-width:0;flex:1 1 0;padding:7px 10px;font-size:12.5px;white-space:nowrap}
+  .vat-xb-row{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-bottom:11px}
+  .vat-xb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);font-weight:700}
+  .vat-xb-row .srcToggle{margin-bottom:0;min-width:0;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .vat-xb-row .srcbtn{min-width:0;width:100%;padding:8px 10px;font-size:12.5px;white-space:nowrap}
   .vat-xb-res{margin-top:14px;padding:14px 15px;background:var(--paper,#faf7f1);border:1px solid var(--line);border-radius:10px}
   .vat-xb-head{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:9px}
   .vat-xb-head .vat-badge{min-width:0;font-size:12px;font-family:var(--sans);font-weight:700;padding:5px 11px;border-radius:7px}
