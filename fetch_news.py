@@ -39,15 +39,6 @@ FEEDS = [
      "url": "https://www.infor.pl/prawo/.feed"},
     {"id": "infor-ka", "name": "INFOR Kadry / ZUS",    "cat": "Kadry",   "color": "#3b5c8a",
      "url": "https://kadry.infor.pl/.feed"},
-
-    # --- Interpretacje podatkowe KIS / Min. Finansow ---
-    # UWAGA: interpretacje-podatkowe.org zostalo zawieszone ("account suspended"),
-    # wiec kanal nie dziala - wylaczony. Interpretacje obsluguje teraz zakladka
-    # "Interpretacje" (launcher do oficjalnej wyszukiwarki EUREKA).
-    # {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
-    #  "url": "https://interpretacje-podatkowe.org/feed"},
-
-    # --- Serwis specjalistyczny (na próbę - sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
      {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
@@ -56,7 +47,6 @@ FEEDS = [
      {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
      {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
      {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
-     Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
