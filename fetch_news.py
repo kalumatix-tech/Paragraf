@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Paragraf — generator kokpitu podatkowo-prawnego.
+Paragraf - generator kokpitu podatkowo-prawnego.
 Pobiera kanaly RSS i sklada statyczna strone public/index.html.
 Uruchamiany automatycznie przez GitHub Actions (patrz .github/workflows/update.yml).
 
@@ -22,14 +22,14 @@ import feedparser
 import requests
 
 # ------------------------------------------------------------------ #
-#  ZRODLA  —  dodawaj / usuwaj tutaj                                  #
-#  (uzywamy AKTYWNEGO wzoru ".feed" — stare adresy rss.* byly martwe) #
+#  ZRODLA  -  dodawaj / usuwaj tutaj                                  #
+#  (uzywamy AKTYWNEGO wzoru ".feed" - stare adresy rss.* byly martwe) #
 # ------------------------------------------------------------------ #
 FEEDS = [
     # ============================================================== #
     #  ZASADA: tylko DZIALY scisle podatkowo-prawne, NIE cale gazety. #
     #  Cale portale (rp.pl, money, wprost, BI) wpuszczaly kulture,    #
-    #  sport i film ("Plus Minus") — dlatego ich tu NIE ma.           #
+    #  sport i film ("Plus Minus") - dlatego ich tu NIE ma.           #
     # ============================================================== #
 
     # --- INFOR: dzialy tematyczne (potwierdzone, swieze, na temat) ---
@@ -44,15 +44,15 @@ FEEDS = [
     {"id": "kis",      "name": "Interpretacje (KIS)",  "cat": "Podatki", "color": "#6b2e8a",
      "url": "https://interpretacje-podatkowe.org/feed"},
 
-    # --- Serwis specjalistyczny (na próbę — sprawdź licznik w logu) ---
+    # --- Serwis specjalistyczny (na próbę - sprawdź licznik w logu) ---
     {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
      "url": "https://www.podatki.biz/rss/rss.xml"},
 
     # ============================================================== #
-    #  CALE GAZETY — WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  CALE GAZETY - WYLACZONE, bo daja kulture/sport/film, a nie     #
     #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
     #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
-    #  ikone RSS, przyslij mi adres — podepne TYLKO ten dzial.        #
+    #  ikone RSS, przyslij mi adres - podepne TYLKO ten dzial.        #
     #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
     # ============================================================== #
     # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
@@ -72,12 +72,12 @@ UA = "Mozilla/5.0 (compatible; ParagrafBot/1.0; +https://github.com)"
 # Dziala TYLKO, gdy ustawiony jest sekret ANTHROPIC_API_KEY. 0 = wylacz.
 SUMMARIZE_TOP = 18
 
-# Filtr trafnosci AI — ODLOZONY (najpierw domykamy dzialy/daty bez AI).
+# Filtr trafnosci AI - ODLOZONY (najpierw domykamy dzialy/daty bez AI).
 # Gdy zechcesz: ustaw True (wymaga sekretu ANTHROPIC_API_KEY).
 AI_FILTER = False
 
 # ------------------------------------------------------------------ #
-#  ZRODLA OFICJALNE (publiczne API Kancelarii Sejmu — bez klucza)     #
+#  ZRODLA OFICJALNE (publiczne API Kancelarii Sejmu - bez klucza)     #
 #  Dziennik Ustaw + Monitor Polski (publikowane akty) oraz projekty   #
 #  ustaw (druki sejmowe). To autorytatywne, niezalezne od portali.    #
 # ------------------------------------------------------------------ #
@@ -92,12 +92,12 @@ OFFICIAL_MAX_AGE_DAYS = 60    # okno swiezosci dla projektow (aktywne w procesie
 OFFICIAL_SRC = {
     "du":   {"name": "Dziennik Ustaw",  "cat": "Legislacja", "color": "#1d3a6b"},
     "mp":   {"name": "Monitor Polski",  "cat": "Legislacja", "color": "#0f5c4a"},
-    "sejm": {"name": "Sejm — projekty",  "cat": "Projekty",   "color": "#7a2e5c"},
+    "sejm": {"name": "Sejm - projekty",  "cat": "Projekty",   "color": "#7a2e5c"},
 }
 
 # Z urzedowego "firehose'a" (wszystkie akty/projekty) przepuszczamy tylko te,
 # ktorych TYTUL pasuje SCISLE podatkowo/fiskalnie. Rdzenie slow (jak w BLOCK/FOCUS).
-# (Swiadomie waskie — wczesniej "oplat"/"finans"/"budzet" wpuszczaly kulture i oswiate.)
+# (Swiadomie waskie - wczesniej "oplat"/"finans"/"budzet" wpuszczaly kulture i oswiate.)
 OFFICIAL_TOPICS = [
     "podatk", "vat", "cit", "pit", "akcyz", "ryczałt", "ordynacj", "składk",
     "zus", "rachunkow", "cło", "celn", "faktur", "ksef", "jpk", "danin",
@@ -105,7 +105,7 @@ OFFICIAL_TOPICS = [
 ]
 
 # ------------------------------------------------------------------ #
-#  ODSIEW  —  to tutaj decydujesz, co odpada                          #
+#  ODSIEW  -  to tutaj decydujesz, co odpada                          #
 # ------------------------------------------------------------------ #
 #
 #  JAK DZIALA DOPASOWANIE SLOW (wazne dla polskiego!):
@@ -129,7 +129,7 @@ BLOCK = [
     "mecz", "piłk", "rozrywk", "quiz", "kupon", "promo", "black friday",
 ]
 
-# 3) BIALA LISTA (slownikowa) — dziala TYLKO gdy NIE masz klucza AI.
+# 3) BIALA LISTA (slownikowa) - dziala TYLKO gdy NIE masz klucza AI.
 #    Z kluczem AI relevancje ocenia model (ponizej), wiec ta lista jest pomijana.
 #    Scisle podatkowa: bez rdzenia "ustaw" (lapal kazda ustawe!) i bez ogolnych
 #    terminow prawnych/biznesowych. Chcesz widziec WSZYSTKO? Ustaw FOCUS = [].
@@ -162,7 +162,7 @@ def to_iso(entry) -> str | None:
 
 
 def _norm(text: str) -> str:
-    """Małe litery, bez polskich ogonków, bez interpunkcji — do porównań."""
+    """Małe litery, bez polskich ogonków, bez interpunkcji - do porównań."""
     text = (text or "").lower()
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
@@ -267,11 +267,11 @@ def apply_filters(items):
 def ai_summary(items):
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
-        print("  (bez AI — brak sekretu ANTHROPIC_API_KEY)")
+        print("  (bez AI - brak sekretu ANTHROPIC_API_KEY)")
         return None
     top = items[:25]
     lst = "\n".join(
-        f"{i+1}. [{it['cat']}] {it['title']}" + (f" — {it['desc'][:150]}" if it["desc"] else "")
+        f"{i+1}. [{it['cat']}] {it['title']}" + (f" - {it['desc'][:150]}" if it["desc"] else "")
         for i, it in enumerate(top)
     )
     prompt = (
@@ -327,7 +327,7 @@ def _summarize_one(it: dict, key: str) -> None:
     if not src:
         return
     prompt = (
-        "Streść poniższy artykuł w DOKŁADNIE dwóch krótkich zdaniach po polsku — rzeczowo "
+        "Streść poniższy artykuł w DOKŁADNIE dwóch krótkich zdaniach po polsku - rzeczowo "
         "i konkretnie, bez clickbaitu i bez ogólnego wstępu. Podaj najważniejszy fakt: "
         "co się zmienia albo co warto wiedzieć.\n\nArtykuł:\n" + src[:2200]
     )
@@ -351,7 +351,7 @@ def summarize_articles(items) -> None:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key or SUMMARIZE_TOP <= 0:
         if not key:
-            print("  (bez streszczeń artykułów — brak sekretu ANTHROPIC_API_KEY)")
+            print("  (bez streszczeń artykułów - brak sekretu ANTHROPIC_API_KEY)")
         return
     targets = [it for it in items if not it.get("official")][:SUMMARIZE_TOP]
     print(f"  Streszczam {len(targets)} najnowszych artykułów…")
@@ -363,7 +363,7 @@ def summarize_articles(items) -> None:
 
 
 # ------------------------------------------------------------------ #
-#  ZRODLA OFICJALNE — pobieranie z API Sejm/ELI                       #
+#  ZRODLA OFICJALNE - pobieranie z API Sejm/ELI                       #
 # ------------------------------------------------------------------ #
 def _date_iso(s: str):
     s = (s or "").strip()
@@ -391,7 +391,7 @@ def _api_get(url: str, timeout: int = 25):
 
 
 def _http_get_text(url: str, timeout: int = 25):
-    """Pobiera surowy HTML (RCL nie ma API — parsujemy stronę)."""
+    """Pobiera surowy HTML (RCL nie ma API - parsujemy stronę)."""
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout)
         if r.status_code != 200:
@@ -483,10 +483,10 @@ def _rcl_stages(page_text):
 
 def _rcl_status(page_text):
     """Rozpoznaje status projektu z jego STRONY (nie z listy):
-    'left'  – opuścił rząd (dalszy ciąg w Sejmie/Dz.U.),
-    'closed'– zamknięty (wycofany/niezakończony w rządzie),
-    'in_gov'– wciąż w rządzie,
-    None    – nie udało się pobrać strony."""
+    'left'  - opuścił rząd (dalszy ciąg w Sejmie/Dz.U.),
+    'closed'- zamknięty (wycofany/niezakończony w rządzie),
+    'in_gov'- wciąż w rządzie,
+    None    - nie udało się pobrać strony."""
     if not page_text:
         return None
     low = page_text.lower()
@@ -513,12 +513,12 @@ def _rcl_keep_in_gov(items, limit=12):
 
 def _rcl_projects():
     """ETAP RZĄDOWY: projekty ustaw z wykazu RCL (legislacja.rcl.gov.pl),
-    zanim trafią do Sejmu. Brak API — parsujemy listę regexem (defensywnie).
-    Łączymy dwa źródła: (1) wyszukiwarkę RCL po słowach podatkowych — łapie też
+    zanim trafią do Sejmu. Brak API - parsujemy listę regexem (defensywnie).
+    Łączymy dwa źródła: (1) wyszukiwarkę RCL po słowach podatkowych - łapie też
     STARSZE projekty (np. UD116), oraz (2) najnowsze strony listy."""
     out, seen = [], set()
     base = "https://legislacja.rcl.gov.pl/lista?typeId=2"   # typeId=2 = projekty ustaw
-    # (1) Wyszukiwarka RCL po hasłach podatkowych (param `title`) — łapie też starsze.
+    # (1) Wyszukiwarka RCL po hasłach podatkowych (param `title`) - łapie też starsze.
     for kw in ("podatek", "podatku", "VAT", "akcyza", "KSeF", "PIT", "CIT", "Krajowy System e-Faktur"):
         if len(out) >= RCL_MAX:
             break
@@ -550,7 +550,7 @@ def _official_date_ok(iso: str) -> bool:
 
 
 def _act_date_ok(iso: str) -> bool:
-    """OPUBLIKOWANE akty do wyszukiwarki — szersze okno (cały rok), ale nadal
+    """OPUBLIKOWANE akty do wyszukiwarki - szersze okno (cały rok), ale nadal
     odrzuca przyszłe/błędne roczniki (np. '2206')."""
     if not iso:
         return False
@@ -604,7 +604,7 @@ def _topic_ok(title: str) -> bool:
 
 
 def _eli_items(pub: str):
-    """Dziennik Ustaw (DU) lub Monitor Polski (MP) — najnowsze akty na temat."""
+    """Dziennik Ustaw (DU) lub Monitor Polski (MP) - najnowsze akty na temat."""
     year = datetime.datetime.now(datetime.timezone.utc).year
     data = _api_get(f"https://api.sejm.gov.pl/eli/acts/{pub}/{year}")
     if not data:
@@ -641,7 +641,7 @@ def _eli_items(pub: str):
 
 
 def _sejm_prints():
-    """Projekty ustaw i inne druki sejmowe — najnowsze na temat, z etapem procesu."""
+    """Projekty ustaw i inne druki sejmowe - najnowsze na temat, z etapem procesu."""
     data = _api_get(f"https://api.sejm.gov.pl/sejm/term{SEJM_TERM}/prints?sort_by=-documentDate&limit=80")
     if data is None:
         return []
@@ -698,7 +698,7 @@ def fetch_official():
     for label, getter in (("Rząd (RCL)", _rcl_projects),
                           ("Dz.U.", lambda: _eli_items("DU")),
                           ("Monitor Polski", lambda: _eli_items("MP")),
-                          ("Sejm — projekty", _sejm_prints)):
+                          ("Sejm - projekty", _sejm_prints)):
         try:
             items += getter()
         except Exception as e:
@@ -708,7 +708,7 @@ def fetch_official():
 
 
 # ------------------------------------------------------------------ #
-#  FILTR AI RELEVANCJI — zostawia tylko ŚCIŚLE podatkowe newsy.       #
+#  FILTR AI RELEVANCJI - zostawia tylko ŚCIŚLE podatkowe newsy.       #
 #  Jedno zbiorcze zapytanie do modelu. Bez klucza: pomijany (zostaje  #
 #  filtr slownikowy FOCUS). Przy bledzie: nie odsiewa (bezpiecznie).  #
 # ------------------------------------------------------------------ #
@@ -743,7 +743,7 @@ def ai_filter_relevance(items):
         text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
         keep = {int(x) for x in re.findall(r"\d+", text)}
         if not keep:
-            print("  [AI filtr] brak trafień — nie odsiewam (zostawiam wszystko)")
+            print("  [AI filtr] brak trafień - nie odsiewam (zostawiam wszystko)")
             return items
         approved = {id(cand[i]) for i in keep if 0 <= i < len(cand)}
         before = len(cand)
@@ -751,7 +751,7 @@ def ai_filter_relevance(items):
         print(f"  [AI filtr] ściśle podatkowe: {len(approved)}/{before} newsów")
         return result
     except Exception as ex:
-        print(f"  [AI filtr błąd] {ex} — nie odsiewam")
+        print(f"  [AI filtr błąd] {ex} - nie odsiewam")
         return items
 
 
@@ -943,6 +943,21 @@ TEMPLATE = r'''<!DOCTYPE html>
   .addbtn.added{background:var(--accent);border-color:var(--accent);color:#f3e9df}
   .lright{display:flex;align-items:center;gap:9px}
   .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:2px}
+  .lacts{display:flex;align-items:center;gap:7px;flex:none}
+  .notifybtn{flex:none;height:24px;padding:0 9px;border-radius:13px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-faint);font-size:11.5px;font-weight:600;letter-spacing:.01em;
+    cursor:pointer;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;transition:.15s;font-family:inherit}
+  .notifybtn:hover{border-color:var(--accent);color:var(--accent)}
+  .notifybtn.on{background:var(--accent);border-color:var(--accent);color:#f3e9df}
+  .notifybox{border:1px solid var(--accent);background:#fbf3ec;border-radius:12px;padding:14px 16px;margin-bottom:18px}
+  .nb-head{font-weight:700;color:var(--accent);font-size:14.5px;margin-bottom:5px}
+  .nb-info{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin:0 0 9px}
+  .nb-text{width:100%;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+    color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+    resize:vertical;line-height:1.5}
+  .nb-copy{margin-top:9px;height:30px;padding:0 14px;border-radius:8px;border:1px solid var(--accent);
+    background:var(--accent);color:#f3e9df;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .nb-copy:hover{filter:brightness(1.08)}
   .tabbadge{display:none;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--accent);
     color:#f3e9df;font-size:10px;font-weight:700;line-height:17px;text-align:center;margin-left:6px;vertical-align:middle}
   .tabbadge.show{display:inline-block}
@@ -1327,9 +1342,12 @@ function mojeCard(it){
   const label = it.type==="news" ? "Wiadomość" : (it.type==="rcl" ? "RCL" : "Ustawa");
   const col   = it.type==="news" ? "#7a5a2e" : (it.type==="rcl" ? "#8a2e2a" : "#1d3a6b");
   const st = it.stage ? `<div class="lstage"><span>Etap</span> ${esc(it.stage)}</div>` : "";
+  const bell = it.type==="rcl"
+    ? `<button class="notifybtn${it.notify?' on':''}" data-notify="${esc(it.link)}" title="${it.notify?'Pilnowane mailowo - kliknij, aby wyłączyć':'Dodaj do powiadomień mailowych'}">${it.notify?'🔔 pilnowane':'🔔 powiadom'}</button>`
+    : "";
   return `<article class="lcard" style="--ccol:${col}">
     <div class="lhead"><span class="lsrc"><span class="dot"></span><b>${esc(label)}</b>${it.src?" · "+esc(it.src):""}</span>
-      <button class="addbtn added" data-rm="${esc(it.link)}" title="Usuń z „Moje”">✓</button></div>
+      <span class="lacts">${bell}<button class="addbtn added" data-rm="${esc(it.link)}" title="Usuń z „Moje”">✓</button></span></div>
     <a class="ltitle" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
     ${st}
   </article>`;
@@ -1340,8 +1358,31 @@ function renderMoje(){
     L.innerHTML=`<div class="empty"><div class="ic">§</div><h3>Pusto w „Moje"</h3><p>Dodawaj pozycje plusikiem + z innych zakładek.</p></div>`;
     return 0;
   }
-  L.innerHTML=`<div class="lsec-head"><span class="lt">Twoja kolekcja</span><span class="lcount">${state.moje.length} zapisanych</span></div>`
-    +`<div class="lgrid">${state.moje.map(mojeCard).join("")}</div>`;
+  const watch = state.moje.filter(x=>x.type==="rcl" && x.notify);
+  let panel = "";
+  if(watch.length){
+    const lines = watch.map(x=>x.link).join("\n");
+    const word = watch.length===1 ? "projekt" : "projekty";
+    panel = `<div class="notifybox">
+      <div class="nb-head">🔔 Do powiadomień mailowych - ${watch.length} ${word}</div>
+      <p class="nb-info">Te projekty masz oznaczone dzwonkiem. Żeby robot pisał Ci maila przy zmianie etapu, wklej poniższe linie do pliku <b>obserwowane.txt</b> w repozytorium (dopisz na końcu) i zatwierdź zmianę.</p>
+      <textarea class="nb-text" readonly rows="${Math.min(watch.length,6)}" onclick="this.select()">${esc(lines)}</textarea>
+      <button class="nb-copy" id="nbCopy">Kopiuj linie</button>
+    </div>`;
+  }
+  L.innerHTML = panel
+    + `<div class="lsec-head"><span class="lt">Twoja kolekcja</span><span class="lcount">${state.moje.length} zapisanych</span></div>`
+    + `<div class="lgrid">${state.moje.map(mojeCard).join("")}</div>`;
+  const cp=$("#nbCopy");
+  if(cp) cp.onclick=()=>{
+    const ta=L.querySelector(".nb-text"); if(!ta) return;
+    ta.select();
+    let ok=false;
+    try{ navigator.clipboard.writeText(ta.value); ok=true; }catch(_){}
+    if(!ok){ try{ document.execCommand("copy"); }catch(_){} }
+    cp.textContent="Skopiowano ✓";
+    setTimeout(()=>{ cp.textContent="Kopiuj linie"; },1600);
+  };
   return state.moje.length;
 }
 
@@ -1381,6 +1422,8 @@ function switchTab(t){
   document.body.addEventListener("click", e=>{
     const add=e.target.closest(".addbtn[data-item]");
     if(add){ try{ toggleMoje(JSON.parse(add.dataset.item)); }catch(_){} return; }
+    const bell=e.target.closest("[data-notify]");
+    if(bell){ const it=state.moje.find(x=>x.link===bell.dataset.notify); if(it){ it.notify=!it.notify; saveMoje(); render(); } return; }
     const rm=e.target.closest("[data-rm]");
     if(rm){ state.moje=state.moje.filter(x=>x.link!==rm.dataset.rm); saveMoje(); render(); }
   });
@@ -1450,7 +1493,7 @@ def main():
         print(f"  [podsumowanie POMINIĘTE] {e}")
         summary = ""
 
-    # Lista źródeł do kafelków — TYLKO portale RSS (źródła oficjalne mają teraz
+    # Lista źródeł do kafelków - TYLKO portale RSS (źródła oficjalne mają teraz
     # własną sekcję "Ścieżka legislacyjna", więc nie dublujemy ich w chipach).
     chip_sources = [{"id": f["id"], "name": f["name"], "cat": f["cat"], "color": f["color"]} for f in FEEDS]
 
@@ -1459,7 +1502,7 @@ def main():
     out.mkdir(exist_ok=True)
     (out / "index.html").write_text(
         render(items, chip_sources, summary, live + olive, total_sources), encoding="utf-8")
-    print("Zapisano public/index.html — gotowe.")
+    print("Zapisano public/index.html - gotowe.")
 
 
 if __name__ == "__main__":
