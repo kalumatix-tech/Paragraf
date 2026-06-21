@@ -48,13 +48,23 @@ FEEDS = [
     #  "url": "https://interpretacje-podatkowe.org/feed"},
 
     # --- Serwis specjalistyczny (na próbę - sprawdź licznik w logu) ---
-    {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b","url": "https://www.podatki.biz/rss/rss.xml"},
-     {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
-     {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
-     {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
-     {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
-     {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
-     {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    {"id": "podatkibiz", "name": "Podatki.biz",        "cat": "Podatki", "color": "#5c2e6b",
+     "url": "https://www.podatki.biz/rss/rss.xml"},
+
+    # ============================================================== #
+    #  CALE GAZETY - WYLACZONE, bo daja kulture/sport/film, a nie     #
+    #  pozwalaja pobrac samego dzialu podatki/prawo przez RSS.        #
+    #  Chcesz ktorys z nich? Wejdz na jego dzial Prawo/Podatki, znajdz#
+    #  ikone RSS, przyslij mi adres - podepne TYLKO ten dzial.        #
+    #  (INFOR i tak wydaje Dziennik Gazete Prawna, wiec masz pokrycie)#
+    # ============================================================== #
+    # {"id": "money",  "name": "Money.pl",         "cat":"Finanse","color":"#2e7d6b","url":"https://www.money.pl/rss/"},
+    # {"id": "bi",     "name": "Business Insider",  "cat":"Biznes", "color":"#6b6b2a","url":"https://businessinsider.com.pl/.feed"},
+    # {"id": "wprost", "name": "Wprost",            "cat":"Biznes", "color":"#8a4a2e","url":"https://www.wprost.pl/rss.xml"},
+    # {"id": "rp",     "name": "Rzeczpospolita",    "cat":"Prawo",  "color":"#4a4a8a","url":"https://www.rp.pl/rss/1019"},
+    # {"id": "bankier","name": "Bankier.pl",        "cat":"Finanse","color":"#9a6b2e","url":"https://www.bankier.pl/rss/finanse.xml"},
+    # {"id": "infor-mf","name":"INFOR Moja firma",  "cat":"Biznes", "color":"#2e6e8c","url":"https://mojafirma.infor.pl/.feed"},
+    # Martwe / bez RSS: Gazeta Prawna (kanal zamarl 02.2026), Prawo.pl (brak RSS).
 ]
 
 MAX_ITEMS = 120                 # ile pozycji trzymamy na stronie
@@ -914,6 +924,22 @@ TEMPLATE = r'''<!DOCTYPE html>
   .lcard.is-done{border-left-color:#1b6e4f}
   .lnote-done{color:#0f5c3a;background:rgba(27,110,79,.08);font-weight:600}
   .lnote-warn{color:#8a5a00;background:rgba(180,120,0,.10);font-weight:600}
+  /* terminarz podatkowy */
+  .t-today{font-size:13px;color:var(--ink-soft);margin:2px 2px 14px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .tcard{border:1px solid var(--line);border-left:3px solid var(--ccol);background:var(--surface);
+    border-radius:var(--radius);padding:13px 15px;box-shadow:0 1px 2px rgba(22,35,59,.04)}
+  .tcard.t-soon{background:rgba(180,120,0,.05)}
+  .tcard.t-now{background:rgba(138,46,42,.06);border-color:rgba(138,46,42,.3)}
+  .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+  .tdate{font-family:var(--serif);font-size:19px;font-weight:600;color:var(--ink)}
+  .tdate i{font-style:normal;font-size:12px;color:var(--ink-faint);font-family:var(--sans);margin-left:3px}
+  .twhen{font-size:11.5px;font-weight:700;color:var(--ink-faint);white-space:nowrap}
+  .twhen.t-soon{color:#8a5a00}
+  .twhen.t-now{color:var(--accent)}
+  .ttitle{font-size:14px;font-weight:600;color:var(--ink);line-height:1.34}
+  .tmeta{font-size:11.5px;color:var(--ink-soft);margin-top:6px}
+  .tnote{font-size:11.5px;color:var(--ink-faint);margin-top:4px;line-height:1.35}
   /* rozwijana karta etapów rządowych (RCL) */
   .rclproc{margin-top:8px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .rclproc summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
@@ -1003,6 +1029,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   <div class="wrap">
     <nav class="tabs">
       <button class="tab on" data-tab="news">Wiadomości</button>
+      <button class="tab" data-tab="terminy">Terminy</button>
       <button class="tab" data-tab="legis">Ustawy</button>
       <button class="tab" data-tab="rcl">RCL</button>
       <button class="tab" data-tab="wyroki">Wyroki</button>
@@ -1076,6 +1103,14 @@ TEMPLATE = r'''<!DOCTYPE html>
       <section id="mojeList"></section>
     </section>
 
+    <section id="terminyView" hidden>
+      <div class="controls">
+        <div class="chips" id="termChips"></div>
+        <p class="livehint" style="margin:10px 2px 0">Najbliższe terminy podatkowe i sprawozdawcze. Daty już <b>przesunięte</b>, gdy wypadają w sobotę/niedzielę/święto (art. 12 §5 Ordynacji). Liczone na dziś w Twojej przeglądarce. To <b>ogólny terminarz</b> dla typowych przypadków — które terminy faktycznie Cię dotyczą, zależy od formy klienta (VAT mies./kwart., skala/ryczałt, spółka/JDG). Filtruj chipami wyżej.</p>
+      </div>
+      <div id="terminyList"></div>
+    </section>
+
     <footer>
       <b>Paragraf</b> aktualizuje się automatycznie kilka razy dziennie — w jednym miejscu.<br>
       <b>Wiadomości</b> — artykuły z portali (chipem włączasz/wyłączasz źródło). <b>Ustawy</b> — projekty w Sejmie i ustawy ogłoszone w Dz.U. <b>RCL</b> — projekty na etapie rządowym, z rozwijanymi etapami. <b>Moje</b> — pozycje dodane plusikiem. Wybory zapamiętuje przeglądarka.
@@ -1086,10 +1121,11 @@ TEMPLATE = r'''<!DOCTYPE html>
 const DATA = {DATA};
 const BUILT = "{BUILT}";
 const FEEDS = {FEEDS};
-const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos" };
+const state = { off:new Set(), q:"", qL:"", qR:"", tab:"news", moje:[], wyrokiSrc:"saos", termOff:new Set() };
 const $ = s => document.querySelector(s);
 try{ const s=localStorage.getItem("paragraf-off"); if(s) state.off=new Set(JSON.parse(s)); }catch(e){}
 try{ const s=localStorage.getItem("paragraf-moje"); if(s) state.moje=JSON.parse(s)||[]; }catch(e){}
+try{ const s=localStorage.getItem("paragraf-termoff"); if(s) state.termOff=new Set(JSON.parse(s)); }catch(e){}
 const presentIds = new Set(DATA.map(d=>d.fid));
 
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -1569,6 +1605,126 @@ function updateMojeBadge(n){
   const b=$("#mojeBadge"); if(!b) return;
   b.textContent=n||""; b.classList.toggle("show",(n||0)>0);
 }
+// ===== TERMINARZ PODATKOWY (czysta logika dat - bez API, liczone w przegladarce) =====
+const T_MIES=["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec","sierpień","wrzesień","październik","listopad","grudzień"];
+const T_DNI=["niedz.","pon.","wt.","śr.","czw.","pt.","sob."];
+const T_CAT={VAT:"#1d3a6b", PIT:"#8a2e2a", CIT:"#6b4a8a", ZUS:"#0f5c4a", Kadry:"#8a5a2e", Roczne:"#4a4a4a"};
+// Reguly terminow. day=dzien ustawowy; months=miesiace wystepowania; okres=opis za jaki okres.
+const T_RULES=[
+  {day:15, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"ZUS", label:"Składki ZUS — płatnicy będący osobami prawnymi", okres:"prev-month", note:"np. spółki z o.o., S.A."},
+  {day:20, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"ZUS", label:"Składki ZUS — pozostali płatnicy", okres:"prev-month", note:"m.in. JDG, osoby fizyczne i podmioty bez osobowości prawnej"},
+  {day:20, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"PIT", label:"Zaliczka PIT — skala / liniowy (miesięcznie)", okres:"prev-month", note:"przedsiębiorcy rozliczający się miesięcznie"},
+  {day:20, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"PIT", label:"Ryczałt od przychodów ewidencjonowanych (miesięcznie)", okres:"prev-month", note:""},
+  {day:20, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"Kadry", label:"Zaliczki na PIT od wynagrodzeń (płatnik, PIT-4)", okres:"prev-month", note:"zaliczki pobrane od pracowników / zleceniobiorców"},
+  {day:20, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"CIT", label:"Zaliczka CIT (miesięcznie)", okres:"prev-month", note:"spółki rozliczające się miesięcznie"},
+  {day:25, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"VAT", label:"JPK_V7M — plik JPK + zapłata VAT", okres:"prev-month", note:"rozliczenie miesięczne VAT"},
+  {day:25, months:[1,2,3,4,5,6,7,8,9,10,11,12], cat:"VAT", label:"Informacja podsumowująca VAT-UE", okres:"prev-month", note:"transakcje wewnątrzwspólnotowe"},
+  {day:25, months:[1,4,7,10], cat:"VAT", label:"JPK_V7K — deklaracja kwartalna VAT", okres:"prev-quarter", note:"rozliczenie kwartalne VAT"},
+  {day:20, months:[1,4,7,10], cat:"PIT", label:"Zaliczka kwartalna PIT / CIT", okres:"prev-quarter", note:"dla rozliczających się kwartalnie"},
+  {day:20, months:[1,4,7,10], cat:"PIT", label:"Ryczałt — rozliczenie kwartalne", okres:"prev-quarter", note:""},
+  {day:31, months:[1], cat:"Kadry", label:"PIT-4R i PIT-8AR — roczne deklaracje płatnika", okres:"prev-year", note:"do urzędu skarbowego"},
+  {day:31, months:[1], cat:"Kadry", label:"PIT-11 — przekazanie do urzędu skarbowego", okres:"prev-year", note:"informacje o dochodach"},
+  {day:28, months:[2], cat:"Kadry", label:"PIT-11 — przekazanie podatnikowi (pracownikowi)", okres:"prev-year", note:"termin: koniec lutego", lastFeb:true},
+  {day:31, months:[3], cat:"CIT", label:"CIT-8 — zeznanie roczne CIT", okres:"prev-year", note:"gdy rok podatkowy = kalendarzowy"},
+  {day:31, months:[3], cat:"Roczne", label:"Sporządzenie sprawozdania finansowego", okres:"prev-year", note:"jednostki prowadzące księgi rachunkowe"},
+  {day:30, months:[4], cat:"PIT", label:"PIT roczny (PIT-36/37/36L/28/38/39)", okres:"prev-year", note:"zeznania roczne osób fizycznych"},
+  {day:20, months:[5], cat:"ZUS", label:"Roczne rozliczenie składki zdrowotnej", okres:"prev-year", note:"przedsiębiorcy"},
+  {day:30, months:[6], cat:"Roczne", label:"Zatwierdzenie sprawozdania finansowego", okres:"prev-year", note:"do 6 mies. po zakończeniu roku"}
+];
+const _holCache={};
+function tEaster(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),
+    g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,
+    l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+    mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;
+  return new Date(y,mo-1,da);
+}
+function tKey(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function tHolidays(y){
+  if(_holCache[y]) return _holCache[y];
+  const s=new Set(["1-1","1-6","5-1","5-3","8-15","11-1","11-11","12-25","12-26"].map(x=>y+"-"+x));
+  const e=tEaster(y);
+  const mon=new Date(e); mon.setDate(e.getDate()+1);   // Poniedziałek Wielkanocny
+  const cor=new Date(e); cor.setDate(e.getDate()+60);  // Boże Ciało
+  s.add(tKey(mon)); s.add(tKey(cor));
+  _holCache[y]=s; return s;
+}
+function tWorking(d){
+  const g=d.getDay();
+  if(g===0||g===6) return false;
+  return !tHolidays(d.getFullYear()).has(tKey(d));
+}
+function tRoll(d){
+  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  while(!tWorking(x)) x.setDate(x.getDate()+1);
+  return x;
+}
+function tOkres(kind,mo,yr){
+  if(kind==="prev-month"){ let m=mo-1,y=yr; if(m<1){m=12;y--;} return "za "+T_MIES[m-1]+" "+y; }
+  if(kind==="prev-quarter"){ const map={4:["I kwartał",0],7:["II kwartał",0],10:["III kwartał",0],1:["IV kwartał",-1]}; const q=map[mo]; return q?("za "+q[0]+" "+(yr+q[1])):""; }
+  if(kind==="prev-year") return "za "+(yr-1)+" r.";
+  return "";
+}
+function tUpcoming(days){
+  const now=new Date(); const today0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const horizon=new Date(today0); horizon.setDate(today0.getDate()+days);
+  const out=[];
+  for(const r of T_RULES){
+    // sprawdzamy biezacy i nastepny rok, kazdy pasujacy miesiac
+    for(let yr=today0.getFullYear(); yr<=today0.getFullYear()+1; yr++){
+      for(const mo of r.months){
+        let dayNum=r.day;
+        if(r.lastFeb) dayNum=new Date(yr,2,0).getDate();   // ostatni dzień lutego
+        const stat=new Date(yr,mo-1,dayNum);
+        const eff=tRoll(stat);
+        if(eff<today0 || eff>horizon) continue;
+        const diff=Math.round((eff-today0)/86400000);
+        const rolled=eff.getTime()!==stat.getTime();
+        out.push({eff, stat, rolled, diff, cat:r.cat, label:r.label, note:r.note,
+                  okres:tOkres(r.okres,mo,yr)});
+      }
+    }
+  }
+  out.sort((a,b)=> a.eff-b.eff || (a.cat<b.cat?-1:1));
+  return out;
+}
+function tSaveOff(){ try{ localStorage.setItem("paragraf-termoff", JSON.stringify([...state.termOff])); }catch(_){} }
+function tLoadOff(){ try{ const r=localStorage.getItem("paragraf-termoff"); if(r) state.termOff=new Set(JSON.parse(r)); }catch(_){} }
+function tCard(it){
+  const dd=String(it.eff.getDate()).padStart(2,"0")+"."+String(it.eff.getMonth()+1).padStart(2,"0");
+  const wd=T_DNI[it.eff.getDay()];
+  const when = it.diff===0?"dziś!":it.diff===1?"jutro":("za "+it.diff+" dni");
+  const urg = it.diff<=2?"t-now":it.diff<=7?"t-soon":"";
+  const od=String(it.stat.getDate()).padStart(2,"0")+"."+String(it.stat.getMonth()+1).padStart(2,"0");
+  const meta=[it.cat, it.okres].filter(Boolean).join(" · ") + (it.rolled?` · przesunięty z ${od} (dzień wolny)`:"");
+  return `<article class="tcard ${urg}" style="--ccol:${T_CAT[it.cat]||"#777"}">
+    <div class="thead"><span class="tdate">${dd} <i>${wd}</i></span><span class="twhen ${urg}">${esc(when)}</span></div>
+    <div class="ttitle">${esc(it.label)}</div>
+    <div class="tmeta">${esc(meta)}</div>
+    ${it.note?`<div class="tnote">${esc(it.note)}</div>`:""}
+  </article>`;
+}
+function renderTermChips(){
+  const box=$("#termChips"); if(!box) return;
+  const cats=Object.keys(T_CAT);
+  box.innerHTML=cats.map(c=>`<button class="chip" data-tcat="${c}" data-on="${state.termOff.has(c)?0:1}"><span class="dot" style="background:${T_CAT[c]}"></span>${c}</button>`).join("");
+  box.querySelectorAll("[data-tcat]").forEach(b=>b.onclick=()=>{
+    const c=b.dataset.tcat;
+    if(state.termOff.has(c)) state.termOff.delete(c); else state.termOff.add(c);
+    tSaveOff(); render();
+  });
+}
+function renderTerminy(){
+  renderTermChips();
+  const box=$("#terminyList"); if(!box) return 0;
+  const all=tUpcoming(45).filter(it=>!state.termOff.has(it.cat));
+  const now=new Date();
+  const head=`<div class="t-today">Dziś: <b>${now.toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</b> · najbliższe 45 dni</div>`;
+  if(!all.length){ box.innerHTML=head+`<div class="live-status">Brak terminów w tym oknie dla wybranych kategorii (sprawdź chipy wyżej).</div>`; return 0; }
+  box.innerHTML=head+`<div class="tgrid">${all.map(tCard).join("")}</div>`;
+  return all.length;
+}
+
 function render(){
   const n=renderNews(), u=renderUstawy(), r=renderRcl(), mj=renderMoje();
   updateMojeBadge(mj);
@@ -1576,6 +1732,7 @@ function render(){
   if(state.tab==="legis") c=u;
   else if(state.tab==="rcl") c=r;
   else if(state.tab==="moje") c=mj;
+  else if(state.tab==="terminy") c=renderTerminy();
   else if(state.tab==="wyroki") c=($("#wyrokiResults")?$("#wyrokiResults").querySelectorAll(".lcard").length:0);
   else if(state.tab==="kis") c=0;
   else c=n;
@@ -1592,6 +1749,7 @@ function switchTab(t){
   $("#wyrokiView").hidden= t!=="wyroki";
   $("#kisView").hidden   = t!=="kis";
   $("#mojeView").hidden  = t!=="moje";
+  $("#terminyView").hidden = t!=="terminy";
   render();
 }
 
